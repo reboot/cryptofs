@@ -29,83 +29,16 @@
 #include <lufs/proto.h>
 
 #include "base64.h"
-#include "getpw.h"
-
-struct cryptofs_global {
-    int				  count;
-
-    gchar			 *root;
-    int				  cipher;
-    gchar			 *key;
-    guint			  keylen;
-    guchar			**salts;
-    int			  	  blocksize;
-    long int			  fileblocksize;
-    long int			  num_of_salts;
-};
-
-struct cryptofs_context {
-    struct cryptofs_global	 *global;
-
-    gcry_cipher_hd_t 	  	  cipher_hd;
-    struct list_head 	 	 *cfg;
-    void			 *filebuf;
-};
-
-void generate_key(int cipher, int md, const gchar *pass, gchar **key, guint *keylen)
-{
-    int i;
-    int mdlen, buflen;
-    gchar *keybuf;
-
-    gcry_cipher_algo_info(cipher, GCRYCTL_GET_KEYLEN, NULL, keylen);
-    mdlen = gcry_md_get_algo_dlen(md);
-
-    buflen = mdlen < *keylen ? *keylen : mdlen;
-    keybuf = g_new0(unsigned char, buflen);
-    memset(keybuf, 0, buflen);
-
-    gcry_md_hash_buffer(md, keybuf, pass, strlen(pass));
-    if (mdlen < *keylen)
-	for (i = mdlen; i < *keylen; i++)
-	    keybuf[i] = keybuf[i % mdlen];
-
-    *key = keybuf;
-}
-
-gcry_cipher_hd_t open_cipher(struct cryptofs_global *gctx, int cipher)
-{
-    gcry_cipher_hd_t cipherhd = NULL;
-
-    if (gcry_cipher_open(&cipherhd, cipher, GCRY_CIPHER_MODE_CFB, 0) != GPG_ERR_NO_ERROR)
-	return NULL;
-
-    if (gcry_cipher_setkey(cipherhd, gctx->key, gctx->keylen) != GPG_ERR_NO_ERROR) {
-	gcry_cipher_close(cipherhd);
-	cipherhd  = NULL;
-    }
-
-    return cipherhd;
-}
+#include "crypto.h"
 
 void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct credentials *cred, void **global_ctx)
 {
-    struct cryptofs_global *gctx;
-    struct cryptofs_context *ctx;
-    gcry_cipher_hd_t cipher_hd;
-
     if (!(*global_ctx)) {
 	gchar *cryptofs_cfg;
 	char *root;
-	char *salts;
 	const char *cipheralgo, *mdalgo;
-	int cipher, md;
 	long int fileblocksize;
 	long int num_of_salts;
-	int i;
-	char *pass;
-
-	gcry_check_version("1.1.44");
 
 	root = g_strdup(lu_opt_getchar(cfg, "MOUNT", "root"));
 	if (root[strlen(root) - 1] == '/')
@@ -123,12 +56,10 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
     	    printf("CRYPTOFS::cipher missing in config file\n");
     	    return NULL;
 	}
-	cipher = gcry_cipher_map_name(cipheralgo);
 	if ((mdalgo = lu_opt_getchar(cfg, "CRYPTOFS", "md")) == NULL) {
 	    printf("CRYPTOFS::md missing in config file\n");
 	    return NULL;
 	}
-	md = gcry_md_map_name(mdalgo);
 	if (lu_opt_getint(cfg, "CRYPTOFS", "blocksize", &fileblocksize, 0) < 0) {
 	    printf("CRYPTOFS::blocksize missing in config file\n");
 	    return NULL;
@@ -138,63 +69,18 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 	    return NULL;
 	}
 
-	gctx = g_new0(struct cryptofs_global, 1);
-	gctx->cipher = cipher;
-	gctx->root = root;
-	gctx->fileblocksize = fileblocksize;
-	gctx->num_of_salts = num_of_salts;
-
-	pass = getpwd("Enter password:");
-	generate_key(gctx->cipher, md, pass, &gctx->key, &gctx->keylen);
-	putpwd(pass);
-
-	cipher_hd = open_cipher(gctx, gctx->cipher);
-	gcry_cipher_algo_info(gctx->cipher, GCRYCTL_GET_BLKLEN, NULL, &gctx->blocksize);
-	salts = g_malloc0(num_of_salts * gctx->blocksize);
-	gcry_cipher_setiv(cipher_hd, salts, gctx->blocksize);
-	gcry_cipher_encrypt(cipher_hd, salts, num_of_salts * gctx->blocksize, NULL, 0);
-	gctx->salts = g_new0(guchar *, num_of_salts);
-	for (i = 0; i < num_of_salts; i++)
-	    gctx->salts[i] = &salts[i * gctx->blocksize];
-	gctx->count = 1;
-	*global_ctx = gctx;
-	gcry_cipher_close(cipher_hd);
-	cipher_hd = NULL;
-    } else {
-	gctx = (struct cryptofs_global *) *global_ctx;
-	gctx->count++;
+	*global_ctx = crypto_create_global_ctx(cipheralgo, mdalgo, fileblocksize, num_of_salts, root);
+	g_free(root);
     }
 
-    cipher_hd = open_cipher(gctx, gctx->cipher);
-    if (cipher_hd == NULL) {
-        printf("failed to initialize cipher\n");
-        return NULL;
-    }
-
-    ctx = g_new0(struct cryptofs_context, 1);
-    ctx->cfg = cfg;
-    ctx->global = gctx;
-    ctx->cipher_hd = cipher_hd;
-    ctx->filebuf = g_malloc0(gctx->fileblocksize);
-
-    return ctx;
+    return crypto_create_local_ctx(*global_ctx);
 }
 
 void cryptofs_free(void *c)
 {
-    struct cryptofs_context *ctx = (struct cryptofs_context *) c;
+    CtxLocal *ctx = (CtxLocal *) c;
 
-    g_free(ctx->filebuf);
-    gcry_cipher_close(ctx->cipher_hd);
-    ctx->global->count--;
-    if (ctx->global->count == 0) {
-	g_free(ctx->global->salts[0]);
-	g_free(ctx->global->salts);
-	g_free(ctx->global->key);
-	g_free(ctx->global->root);
-	g_free(ctx->global);
-    }
-    g_free(ctx);
+    crypto_destroy_local_ctx(ctx);
 }
 
 int cryptofs_mount(void *ctx)
@@ -204,112 +90,6 @@ int cryptofs_mount(void *ctx)
 
 void cryptofs_umount(void *ctx)
 {
-}
-
-static char *encrypt_name(struct cryptofs_context *ctx, char *name)
-{
-    char *tmpname, *ret;
-    int len;
-    gboolean hidden = FALSE;
-
-    g_return_val_if_fail(ctx != NULL, NULL);
-    g_return_val_if_fail(name != NULL, NULL);
-    g_return_val_if_fail(name[0] != '\0', NULL);
-
-    if (!strcmp(name, ".") || !strcmp(name, ".."))
-	return g_strdup(name);
-
-    if (name[0] == '.')
-	hidden = TRUE;
-
-    tmpname = alloca(strlen(name) + 1);
-    strcpy(tmpname, name + (hidden ? 1 : 0));
-    gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[0], ctx->global->blocksize);
-    gcry_cipher_encrypt(ctx->cipher_hd, tmpname, strlen(name) - (hidden ? 1 : 0), NULL, 0);
-
-    ret = g_new0(char, norm2baselen(strlen(name)) + 5);
-    len = base64_encode(ret + (hidden ? 1 : 0), tmpname, strlen(name) - (hidden ? 1 : 0));
-
-    if (hidden)
-	ret[0] = '.';
-
-    *(ret + len + (hidden ? 1 : 0)) = '\0';
-
-    return ret;
-}
-
-static char *decrypt_name(struct cryptofs_context *ctx, char *name)
-{
-    char *tmpname, *ret;
-    int len;
-    gboolean hidden = FALSE;
-
-    g_return_val_if_fail(ctx != NULL, NULL);
-    g_return_val_if_fail(name != NULL, NULL);
-    g_return_val_if_fail(name[0] != '\0', NULL);
-
-    if (!strcmp(name, ".") || !strcmp(name, ".."))
-	return g_strdup(name);
-
-    if (name[0] == '.')
-	hidden = TRUE;
-
-    tmpname = alloca(base2normlen(strlen(name)) + 5);
-    len = base64_decode(tmpname, name + (hidden ? 1 : 0), strlen(name) - (hidden ? 1 : 0));
-
-    ret = g_new0(char, len + 1 + (hidden ? 1 : 0));
-    memmove(ret + (hidden ? 1 : 0), tmpname, len);
-    gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[0], ctx->global->blocksize);
-    gcry_cipher_decrypt(ctx->cipher_hd, ret + (hidden ? 1 : 0), len, NULL, 0);
-
-    if (hidden)
-	ret[0] = '.';
-
-    return ret;
-}
-
-static char *translate_path(struct cryptofs_context *ctx, char *name)
-{
-    GString *ret;
-    const gchar *root;
-    gchar *namep = name;
-    gchar *retstr;
-    gchar **names, **cur;
-
-    ret = g_string_new("");
-    root = ctx->global->root;
-
-    if (!strncmp(namep, root, strlen(root))) {
-	namep += strlen(root);
-	g_string_append(ret, root);
-	if (namep[0] == '/')
-	    namep++;
-    } else if (namep[0] == '/') {
-	/* pathes must be relative to cryptofs root */
-	return NULL;
-    }
-
-    names = g_strsplit(namep, "/", -1);
-    for (cur = names; *cur != NULL; cur++) {
-	gchar *encname;
-
-	if (*cur[0] == '\0')
-	    continue;
-
-	encname = encrypt_name(ctx, *cur);
-	if (encname == NULL)
-	    continue;
-	if (ret->len > 0)
-	    g_string_append(ret, "/");
-	g_string_append(ret, encname);
-	g_free(encname);
-    }
-    g_strfreev(names);
-
-    retstr = ret->str;
-    g_string_free(ret, FALSE);
-
-    return retstr;
 }
 
 static int lufs_stat(void *ctx, char *name, struct lufs_fattr *fattr)
@@ -337,7 +117,7 @@ int cryptofs_stat(void *ctx, char *name, struct lufs_fattr *fattr)
     gchar *transname;
     gint ret;
 
-    transname = translate_path(ctx, name);
+    transname = crypto_translate_path(ctx, name);
 
     ret = lufs_stat(ctx, transname, fattr);
 
@@ -354,7 +134,7 @@ int cryptofs_readdir(void *ctx, char *_dir_name, struct directory *ddir)
     struct dirent *dent;
     int res;
 
-    dir_name = translate_path(ctx, _dir_name);
+    dir_name = crypto_translate_path(ctx, _dir_name);
 
     if(chdir(dir_name) < 0) {
 	g_free(dir_name);
@@ -378,7 +158,7 @@ int cryptofs_readdir(void *ctx, char *_dir_name, struct directory *ddir)
 	if (!strcmp(dent->d_name, ".cryptofs"))
 	    continue;
         
-	decname = decrypt_name(ctx, dent->d_name);
+	decname = crypto_decrypt_name(ctx, dent->d_name);
         lu_cache_add2dir(ddir, decname, NULL, &fattr);
 	g_free(decname);
     }
@@ -393,7 +173,7 @@ int cryptofs_mkdir(void *ctx, char *_dir, int mode)
     gchar *dir;
     int ret;
 
-    dir = translate_path(ctx, _dir);
+    dir = crypto_translate_path(ctx, _dir);
     ret = mkdir(dir, mode);
     g_free(dir);
 
@@ -405,7 +185,7 @@ int cryptofs_rmdir(void *ctx, char *_dir, int mode)
     gchar *dir;
     int ret;
 
-    dir = translate_path(ctx, _dir);
+    dir = crypto_translate_path(ctx, _dir);
     ret = rmdir(dir);
     g_free(dir);
 
@@ -417,7 +197,7 @@ int cryptofs_create(void *ctx, char *_file, int mode)
     gchar *file;
     int ret;
 
-    file = translate_path(ctx, _file);
+    file = crypto_translate_path(ctx, _file);
     ret = mknod(file, mode, 0);
     g_free(file);
 
@@ -429,7 +209,7 @@ int cryptofs_unlink(void *ctx, char *_file)
     gchar *file;
     int ret;
 
-    file = translate_path(ctx, _file);
+    file = crypto_translate_path(ctx, _file);
     ret = unlink(file);
     g_free(file);
 
@@ -442,8 +222,8 @@ int cryptofs_rename(void *ctx, char *_old_name, char *_new_name)
     gchar *new_name;
     int ret;
 
-    old_name = translate_path(ctx, _old_name);
-    new_name = translate_path(ctx, _new_name);
+    old_name = crypto_translate_path(ctx, _old_name);
+    new_name = crypto_translate_path(ctx, _new_name);
     ret = rename(old_name, new_name);
     g_free(new_name);
     g_free(old_name);
@@ -476,32 +256,16 @@ void translate_pos(long long offset, unsigned long count,
 	    *inblock_count = (offset + count) % blocksize - *inblock_offset;
 }
 
-static int readblock(struct cryptofs_context *ctx, int fp, int block, void *buf)
-{
-    unsigned long res;
-
-    if (lseek(fp, block * ctx->global->fileblocksize, SEEK_SET) < 0)
-	return -1;
-
-    if ((res = read(fp, buf, ctx->global->fileblocksize)) < 0)
-	return -1;
-
-    gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[block % ctx->global->num_of_salts], ctx->global->blocksize);
-    gcry_cipher_decrypt(ctx->cipher_hd, buf, res, NULL, 0);
-
-    return res;
-}
-
-int cryptofs_read(struct cryptofs_context *ctx, char *_file, long long offset, unsigned long count, char *buf)
+int cryptofs_read(CtxLocal *ctx, char *_file, long long offset, unsigned long count, char *buf)
 {
     long long block;
     unsigned long mempos = 0;
-    unsigned long blocksize = ctx->global->fileblocksize;
+    unsigned long blocksize = crypto_get_blocksize(ctx);
     int fp;
     gchar *file;
     gboolean error = FALSE;
 
-    file = translate_path(ctx, _file);
+    file = crypto_translate_path(ctx, _file);
     if ((fp = open(file, 0)) < 0){
 	g_free(file);
 	return -1;
@@ -518,13 +282,13 @@ int cryptofs_read(struct cryptofs_context *ctx, char *_file, long long offset, u
 
 	translate_pos(offset, count, block, blocksize, &inblock_offset, &inblock_count);
 
-	if ((res = readblock(ctx, fp, block, ctx->filebuf)) < 0) {
+	if ((res = crypto_readblock(ctx, fp, block)) < 0) {
 	    error = TRUE;
 	    break;
 	}
 	inblock_read = res - inblock_offset;
 
-	memmove(buf + mempos, ctx->filebuf + inblock_offset, inblock_read);
+	memmove(buf + mempos, crypto_get_filebuf(ctx) + inblock_offset, inblock_read);
 
 	mempos += inblock_read;
 	if (inblock_read < inblock_count)
@@ -535,27 +299,16 @@ int cryptofs_read(struct cryptofs_context *ctx, char *_file, long long offset, u
     return error ? -1 : mempos;
 }
 
-static int writeblock(struct cryptofs_context *ctx, int fp, int block, void *buf, unsigned long size)
-{
-    gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[block % ctx->global->num_of_salts], ctx->global->blocksize);
-    gcry_cipher_encrypt(ctx->cipher_hd, buf, size, NULL, 0);
-
-    if (lseek(fp, block * ctx->global->fileblocksize, SEEK_SET) < 0)
-	return -1;
-
-    return write(fp, buf, size);
-}
-
-int cryptofs_write(struct cryptofs_context *ctx, char *_file, long long offset, unsigned long count, char *buf)
+int cryptofs_write(CtxLocal *ctx, char *_file, long long offset, unsigned long count, char *buf)
 {
     long long block;
     unsigned long mempos = 0;
-    unsigned long blocksize = ctx->global->fileblocksize;
+    unsigned long blocksize = crypto_get_blocksize(ctx);
     int fp;
     gchar *file;
     gboolean error = FALSE;
 
-    file = translate_path(ctx, _file);
+    file = crypto_translate_path(ctx, _file);
     if ((fp = open(file, O_RDWR)) < 0){
 	g_free(file);
 	return -1;
@@ -571,15 +324,15 @@ int cryptofs_write(struct cryptofs_context *ctx, char *_file, long long offset, 
 	translate_pos(offset, count, block, blocksize, &inblock_offset, &inblock_count);
 
 	if ((inblock_offset != 0) && (inblock_count != blocksize)) {
-	    if (readblock(ctx, fp, block, ctx->filebuf) < 0) {
+	    if (crypto_readblock(ctx, fp, block) < 0) {
 		error = TRUE;
 		break;
 	    }
 	}
 
-	memmove(ctx->filebuf + inblock_offset, buf + mempos, inblock_count);
+	memmove(crypto_get_filebuf(ctx) + inblock_offset, buf + mempos, inblock_count);
 
-	if (writeblock(ctx, fp, block, ctx->filebuf, inblock_offset + inblock_count) < 0) {
+	if (crypto_writeblock(ctx, fp, block, inblock_offset + inblock_count) < 0) {
 	    error = TRUE;
 	    break;
 	}
@@ -598,7 +351,7 @@ int cryptofs_readlink(void *ctx, char *_link, char *buf, int buflen)
     gchar *tmpbuf;
     gint ret;
 
-    link = translate_path(ctx, _link);
+    link = crypto_translate_path(ctx, _link);
     tmpbuf = g_malloc0(buflen * 2);
 
     ret = readlink(link, tmpbuf, buflen * 2);
@@ -621,7 +374,7 @@ int cryptofs_readlink(void *ctx, char *_link, char *buf, int buflen)
 	for (cur = names; *cur != NULL; cur++) {
 	    gchar *decname;
 
-	    decname = decrypt_name(ctx, *cur);
+	    decname = crypto_decrypt_name(ctx, *cur);
 	    if (decname == NULL)
 		continue;
 	    if (target->len > 0 || abspath)
@@ -645,8 +398,8 @@ int cryptofs_link(void *ctx, char *_target, char *_lnk)
     gchar *lnk;
     gint ret;
 
-    target = translate_path(ctx, _target);
-    lnk = translate_path(ctx, _lnk);
+    target = crypto_translate_path(ctx, _target);
+    lnk = crypto_translate_path(ctx, _lnk);
     ret = link(target, lnk);
     g_free(target);
     g_free(lnk);
@@ -673,7 +426,7 @@ int cryptofs_symlink(void *ctx, char *_target, char *_link)
     for (cur = names; *cur != NULL; cur++) {
 	gchar *encname;
 
-	encname = encrypt_name(ctx, *cur);
+	encname = crypto_encrypt_name(ctx, *cur);
 	if (encname == NULL)
 	    continue;
 	if (target->len > 0 || abspath)
@@ -683,7 +436,7 @@ int cryptofs_symlink(void *ctx, char *_target, char *_link)
     }
     g_strfreev(names);
 
-    link = translate_path(ctx, _link);
+    link = crypto_translate_path(ctx, _link);
     ret = symlink(target->str, link);
     g_string_free(target, TRUE);
     g_free(link);
@@ -697,7 +450,7 @@ int cryptofs_setattr(void *ctx, char *_file, struct lufs_fattr *fattr)
     int res;
     gchar *file;
 
-    file = translate_path(ctx, _file);
+    file = crypto_translate_path(ctx, _file);
 
     if((res = lstat(file, &stat)) < 0)
         goto out;
