@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="iso-8859-15"?>
 <!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN">
 <article>
     <articleinfo>
@@ -65,7 +65,7 @@
 	<para>
 	    CryptoFS uses Libgcrypt from <ulink
 	    url="ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/">ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/</ulink>
-	    (version >= 1.1.12) and GLib from <ulink
+	    (version >= 1.1.44) and GLib from <ulink
 	    url="http://www.gtk.org">http://www.gtk.org</ulink>
 	    (version >= 2.2). You must have installed these packages
 	    correctly before running CryptoFS's "configure" script.

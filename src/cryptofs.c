@@ -47,7 +47,7 @@ struct cryptofs_global {
 struct cryptofs_context {
     struct cryptofs_global	 *global;
 
-    GcryCipherHd 	  	  cipher_hd;
+    gcry_cipher_hd_t 	  	  cipher_hd;
     struct list_head 	 	 *cfg;
     void			 *filebuf;
 };
@@ -58,7 +58,7 @@ void generate_key(int cipher, int md, const gchar *pass, gchar **key, guint *key
     int mdlen, buflen;
     gchar *keybuf;
 
-    *keylen = gcry_cipher_algo_info(cipher, GCRYCTL_GET_KEYLEN, NULL, 0);
+    gcry_cipher_algo_info(cipher, GCRYCTL_GET_KEYLEN, NULL, keylen);
     mdlen = gcry_md_get_algo_dlen(md);
 
     buflen = mdlen < *keylen ? *keylen : mdlen;
@@ -73,12 +73,14 @@ void generate_key(int cipher, int md, const gchar *pass, gchar **key, guint *key
     *key = keybuf;
 }
 
-GcryCipherHd open_cipher(struct cryptofs_global *gctx, int cipher)
+gcry_cipher_hd_t open_cipher(struct cryptofs_global *gctx, int cipher)
 {
-    GcryCipherHd cipherhd = NULL;
+    gcry_cipher_hd_t cipherhd = NULL;
 
-    cipherhd = gcry_cipher_open(cipher, GCRY_CIPHER_MODE_CFB, 0);
-    if ((cipherhd != NULL) && (gcry_cipher_setkey(cipherhd, gctx->key, gctx->keylen) != GCRYERR_SUCCESS)) {
+    if (gcry_cipher_open(&cipherhd, cipher, GCRY_CIPHER_MODE_CFB, 0) != GPG_ERR_NO_ERROR)
+	return NULL;
+
+    if (gcry_cipher_setkey(cipherhd, gctx->key, gctx->keylen) != GPG_ERR_NO_ERROR) {
 	gcry_cipher_close(cipherhd);
 	cipherhd  = NULL;
     }
@@ -90,7 +92,7 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 {
     struct cryptofs_global *gctx;
     struct cryptofs_context *ctx;
-    GcryCipherHd cipher_hd;
+    gcry_cipher_hd_t cipher_hd;
 
     if (!(*global_ctx)) {
 	gchar *cryptofs_cfg;
@@ -102,6 +104,8 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 	long int num_of_salts;
 	int i;
 	char *pass;
+
+	gcry_check_version("1.1.44");
 
 	root = g_strdup(lu_opt_getchar(cfg, "MOUNT", "root"));
 	if (root[strlen(root) - 1] == '/')
@@ -145,7 +149,7 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 	putpwd(pass);
 
 	cipher_hd = open_cipher(gctx, gctx->cipher);
-	gctx->blocksize = gcry_cipher_algo_info(gctx->cipher, GCRYCTL_GET_BLKLEN, NULL, 0);
+	gcry_cipher_algo_info(gctx->cipher, GCRYCTL_GET_BLKLEN, NULL, &gctx->blocksize);
 	salts = g_malloc0(num_of_salts * gctx->blocksize);
 	gcry_cipher_setiv(cipher_hd, salts, gctx->blocksize);
 	gcry_cipher_encrypt(cipher_hd, salts, num_of_salts * gctx->blocksize, NULL, 0);
