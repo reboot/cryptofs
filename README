@@ -1,0 +1,75 @@
+	LUFS CryptoFS - Virtual encrypted filesystem
+
+   Copyright(C) 2003 Christoph Hohmann
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2, or (at your option)
+   any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+   For more details see the file COPYING.
+
+What's LUFS CryptoFS
+====================
+
+LUFS CryptoFS is a encrypted filesystem for the Linux Userland filesystem.
+For more information on the Linux Userland Filesystem visit
+    http://lufs.sourceforge.net/lufs/
+
+This package will create a shared library that can be used by LUFS's lufsd
+to mount a normal directory to another directory. Every file stored in this
+mountpoint will be written encrypted (data and filename) to the directory
+that was mounted.
+
+Requirements
+============
+
+You have to install the LUFS package from http://lufs.sourceforge.net/lufs/
+This steps will not be explained here. LUFS CryptoFS is only an addon to
+it.
+
+CryptoFS uses Libgcrypt from ftp://ftp.gnupg.org/pub/gcrypt/alpha/libgcrypt/
+(version >= 1.1.12) and GLib from http://www.gtk.org (version >= 2.2). You
+must have installed these packages correctly before running CryptoFS's
+"configure" script.
+
+Usage
+=====
+
+Put the shared library into a directory where the system linker can find
+it (this will usually be done by "make install") or add the directory
+to the search path by setting the LD_LIBRARY_PATH environment varibale.
+
+First you have to set up the source directory by copying the file
+cryptofs.conf to <source>/.cryptofs. You can adjust the values in the
+file, but the default should work fine.
+
+After that you can mount the source directory with
+
+  lufsmount cryptofs://<source> <dest>
+
+You will be asked for the password you want to use for this filesystem. It
+will be used to generate the cipher key.
+
+After that you should be able to use the <dest> directory like any other
+directory, but all data will be read and written to the <source> directory
+in an encrypted form.
+
+.cryptofs configfile
+====================
+
+coming soon
+
+Security
+========
+
+coming soon
