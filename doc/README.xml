@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN">
+<article>
+    <articleinfo>
+	<title>CryptoFS for Linux Userland Filesystem</title>
+	<author>
+	    <firstname>Christoph</firstname>
+	    <surname>Hohmann</surname>
+	    <honorific>B. Sc</honorific>
+	    <affiliation>
+		<address><email>reboot@gmx.ch</email></address>
+    	    </affiliation>
+	</author>
+	<copyright>
+    	    <year>2003</year>
+    	    <holder>Christoph Hohmann</holder>
+	</copyright>
+    </articleinfo>
+    <sect1>
+    	<title>What's CryptoFS</title>
+	<para>
+	    CryptoFS is a encrypted filesystem for the Linux Userland FileSystem.
+	    For more information on the Linux Userland Filesystem visit
+	    <ulink url="http://lufs.sourceforge.net/lufs/">http://lufs.sourceforge.net/lufs/</ulink>
+	</para>
+        <para>
+    	    CryptoFS will use a normal directory to store files encrypted.
+	    The mountpoint will contain the decrypted files. Every file stored
+	    in this mountpoint will be written encrypted (data and filename)
+	    to the directory that was mounted. If you unmount the directory the
+	    encrypted data can only be access by mounting the directory with
+	    the correct key again. Like other LUFS filesystems it does not need
+	    root access or any complicated setup like creating a filesystem on
+	    a encrypted disk using the loop device.
+        </para>
+	<para>
+	    This package will create a shared library that can be used by LUFS's lufsd
+	    to mount a directory containing encrypted data to another directory.
+	</para>
+    </sect1>
+
+    <sect1>
+	<title>Why CryptoFS?</title>
+	<para>
+	    I first used the evfs kernel patch that does nearly the same thing
+	    as CryptoFS. But it seems that it has been abandoned. The last patch
+	    was available for kernel 2.4.20 and has not been updated for newer
+	    kernels since then. When I found LUFS I thought I could be a good
+	    base for a crypto filesystem that works like evfs and allows a user
+	    to mount any directory as an encrypted storage without having root
+	    access and creating a crypto filesystem using the loop device. So
+	    when I found no other program that offers this posibilities I started
+	    to write my own filesystem for LUFS.
+	</para>
+    </sect1>
+
+    <sect1>
+	<title>Requirements</title>
+	<para>
+	    You have to install the LUFS package from <ulink url="http://lufs.sourceforge.net/lufs/">
+	    http://lufs.sourceforge.net/lufs/</ulink>
+	    This steps will not be explained here. CryptoFS is only an addon to
+	    it.
+	</para>
+	<para>
+	    CryptoFS uses Libgcrypt from <ulink
+	    url="ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/">ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/</ulink>
+	    (version >= 1.1.12) and GLib from <ulink
+	    url="http://www.gtk.org">http://www.gtk.org</ulink>
+	    (version >= 2.2). You must have installed these packages
+	    correctly before running CryptoFS's "configure" script.
+	</para>
+    </sect1>
+
+    <sect1>
+	<title>Usage</title>
+	<para>
+    	    Put the shared library into a directory where the system linker can find
+	    it (this will usually be done by "make install") or add the directory
+	    to the search path by setting the LD_LIBRARY_PATH environment varibale.
+	</para>
+        <para>
+	    First you have to set up the source directory by copying the file
+	    cryptofs.conf to &lt;source&gt;/.cryptofs. You can adjust the values in the
+	    file, but the default should work fine.
+	</para>
+	<para>
+	    After that you can mount the source directory with
+	    lufsmount cryptofs://&lt;source&gt; &lt;dest&gt;
+	</para>
+	<para>
+	    You will be asked for the password you want to use for this filesystem. It
+	    will be used to generate the cipher key.
+	</para>
+	<para>
+	    After that you should be able to use the &lt;dest&gt; directory like any other
+	    directory, but all data will be read and written to the &lt;source&gt; directory
+	    in an encrypted form.
+	</para>
+    </sect1>
+
+    <sect1>
+	<title>How does it work?</title>
+	<sect2>
+	    <title>The .cryptofs config file</title>
+	    <para>
+		The CryptoFS config file in each encryted directory contains 4 options.
+		These are
+		<variablelist>
+		    <varlistentry>
+			<term>CRYPTOFS::cipher</term>
+			<listitem>
+			    <para>
+				The cipher algorithm used to encrypt files and filenames.
+				This has to be a cipher name known by libgcrypt.
+			    </para>
+			</listitem>
+		    </varlistentry>
+		    <varlistentry>
+			<term>CRYPTOFS::md</term>
+			<listitem>
+			    <para>
+				The message digest algorithm used to generate the cipher
+				key. This has to be a message digest name known by
+				libgcrypt.
+			    </para>
+			</listitem>
+		    </varlistentry>
+		    <varlistentry>
+			<term>CRYPTOFS::blocksize</term>
+			<listitem>
+			    <para>
+				An encrypted file can not be randomly accessed like a normal
+				file and CryptoFS always reads and writes blocks of this size.
+			    </para>
+			</listitem>
+		    </varlistentry>
+		    <varlistentry>
+			<term>CRYPTOFS::salts</term>
+			<listitem>
+			    <para>
+				This is the number of subkeys CryptoFS will generate to
+				encrypt blocks.
+			    </para>
+			</listitem>
+		    </varlistentry>
+		</variablelist>
+	    </para>
+	</sect2>
+	<sect2>
+	    <title>Encryption</title>
+	    <para>
+		When a filesystem is mounted CryptoFS first generates a key for the
+		requested cipher algorithm (CRYPTOFS::cipher) using the message
+		digest function (CRYPTOFS::md). Every algorithm has a specific key size
+		and every message digest function has a specific length of the
+		generated message digest. If the message digest size is smaller then
+		the keysize the message digest will be repeated until the key size
+		is reached.
+	    </para>
+	    <para>
+		After they primary key has been generated CRYPTOFS::salts subkeys
+		(initialization vectors) will be generated by encrypting 0 bytes with
+		a 0 initialization vector. These will later be used to encrypt blocks
+		with different subkeys to make sure the cipher text will first repeat
+		after (salts * blocksize) bytes (If the same data is encrypted).
+	    </para>
+	    <para>
+		When files or links are created or renamed the name will be encoded
+		with the selected cipher, the primary key and the first subkey.
+		The result will then be encoded using a modified Base64 algorithm
+		because the encrypted filename could contain characters that are not
+		allowed by the target filesystem. (The original Base64 algorithm
+		uses '/' for encoding. This is the directory delimiter so it was
+		replaced by '_')
+	    </para>
+	    <para>
+		When files are written the data will be encrypted. CryptoFS always
+		has to write full blocks. So if only a part of a block should be
+		written the original block will first be read, decrypted, the part
+		replaced and then the result then written encrypted back to disk.
+		To keep this performant that block size must not be too large.
+		But to make sure the cipher text does not repeat to early, CryptoFS
+		uses salts to encrypt blocks. Every block will be encoded with
+		the (blocknumber module salts)th salt. (NOTE: Linux always reads
+		or writes "pages" of size 4096 bytes, these writes will be
+		forwarded by lufsd to CryptoFS. So if you use a blocksize of
+		4096 bytes reading the old block before writing can be omitted
+		and writing should be faster)
+	    </para>
+	</sect2>
+    </sect1>
+</article>

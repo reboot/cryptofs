@@ -49,6 +49,7 @@ struct cryptofs_context {
 
     GcryCipherHd 	  	  cipher_hd;
     struct list_head 	 	 *cfg;
+    void			 *filebuf;
 };
 
 void generate_key(int cipher, int md, const gchar *pass, gchar **key, guint *keylen)
@@ -170,6 +171,7 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
     ctx->cfg = cfg;
     ctx->global = gctx;
     ctx->cipher_hd = cipher_hd;
+    ctx->filebuf = g_malloc0(gctx->fileblocksize);
 
     return ctx;
 }
@@ -178,6 +180,7 @@ void cryptofs_free(void *c)
 {
     struct cryptofs_context *ctx = (struct cryptofs_context *) c;
 
+    g_free(ctx->filebuf);
     gcry_cipher_close(ctx->cipher_hd);
     ctx->global->count--;
     if (ctx->global->count == 0) {
@@ -277,11 +280,17 @@ static char *translate_path(struct cryptofs_context *ctx, char *name)
 	g_string_append(ret, root);
 	if (namep[0] == '/')
 	    namep++;
+    } else if (namep[0] == '/') {
+	/* pathes must be relative to cryptofs root */
+	return NULL;
     }
 
     names = g_strsplit(namep, "/", -1);
     for (cur = names; *cur != NULL; cur++) {
 	gchar *encname;
+
+	if (*cur[0] == '\0')
+	    continue;
 
 	encname = encrypt_name(ctx, *cur);
 	if (encname == NULL)
@@ -484,7 +493,6 @@ int cryptofs_read(struct cryptofs_context *ctx, char *_file, long long offset, u
     long long block;
     unsigned long mempos = 0;
     unsigned long blocksize = ctx->global->fileblocksize;
-    void *decbuf;
     int fp;
     gchar *file;
     gboolean error = FALSE;
@@ -496,7 +504,6 @@ int cryptofs_read(struct cryptofs_context *ctx, char *_file, long long offset, u
     }
     g_free(file);
 
-    decbuf = g_malloc0(blocksize);
     block = offset / blocksize;
 
     for (block = offset / blocksize; block * blocksize < offset + count; block++) {
@@ -507,20 +514,19 @@ int cryptofs_read(struct cryptofs_context *ctx, char *_file, long long offset, u
 
 	translate_pos(offset, count, block, blocksize, &inblock_offset, &inblock_count);
 
-	if ((res = readblock(ctx, fp, block, decbuf)) < 0) {
+	if ((res = readblock(ctx, fp, block, ctx->filebuf)) < 0) {
 	    error = TRUE;
 	    break;
 	}
 	inblock_read = res - inblock_offset;
 
-	memmove(buf + mempos, decbuf + inblock_offset, inblock_read);
+	memmove(buf + mempos, ctx->filebuf + inblock_offset, inblock_read);
 
 	mempos += inblock_read;
 	if (inblock_read < inblock_count)
 	    break;
     }
     close(fp);
-    g_free(decbuf);
 
     return error ? -1 : mempos;
 }
@@ -541,7 +547,6 @@ int cryptofs_write(struct cryptofs_context *ctx, char *_file, long long offset, 
     long long block;
     unsigned long mempos = 0;
     unsigned long blocksize = ctx->global->fileblocksize;
-    void *decbuf;
     int fp;
     gchar *file;
     gboolean error = FALSE;
@@ -553,7 +558,6 @@ int cryptofs_write(struct cryptofs_context *ctx, char *_file, long long offset, 
     }
     g_free(file);
 
-    decbuf = g_malloc0(blocksize);
     block = offset / blocksize;
 
     for (block = offset / blocksize; block * blocksize < offset + count; block++) {
@@ -563,15 +567,15 @@ int cryptofs_write(struct cryptofs_context *ctx, char *_file, long long offset, 
 	translate_pos(offset, count, block, blocksize, &inblock_offset, &inblock_count);
 
 	if ((inblock_offset != 0) && (inblock_count != blocksize)) {
-	    if (readblock(ctx, fp, block, decbuf) < 0) {
+	    if (readblock(ctx, fp, block, ctx->filebuf) < 0) {
 		error = TRUE;
 		break;
 	    }
 	}
 
-	memmove(decbuf + inblock_offset, buf + mempos, inblock_count);
+	memmove(ctx->filebuf + inblock_offset, buf + mempos, inblock_count);
 
-	if (writeblock(ctx, fp, block, decbuf, inblock_offset + inblock_count) < 0) {
+	if (writeblock(ctx, fp, block, ctx->filebuf, inblock_offset + inblock_count) < 0) {
 	    error = TRUE;
 	    break;
 	}
@@ -580,7 +584,6 @@ int cryptofs_write(struct cryptofs_context *ctx, char *_file, long long offset, 
     }
 
     close(fp);
-    g_free(decbuf);
 
     return error ? -1 : mempos;
 }
