@@ -95,13 +95,16 @@ CtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *mdalgo
     cipher = gcry_cipher_map_name(cipheralgo);
     md = md = gcry_md_map_name(mdalgo);
 
+    pass = getpwd("Enter password:");
+    if (pass == NULL)
+	return NULL;
+
     gctx = g_new0(CtxGlobal, 1);
     gctx->cipher = cipher;
     gctx->root = g_strdup(root);
     gctx->fileblocksize = fileblocksize;
     gctx->num_of_salts = num_of_salts;
 
-    pass = getpwd("Enter password:");
     generate_key(gctx->cipher, md, pass, &gctx->key, &gctx->keylen);
     putpwd(pass);
 
@@ -232,11 +235,8 @@ char *crypto_translate_path(CtxLocal *ctx, char *name)
     if (!strncmp(namep, root, strlen(root))) {
 	namep += strlen(root);
 	g_string_append(ret, root);
-	if (namep[0] == '/')
-	    namep++;
     } else if (namep[0] == '/') {
-	/* pathes must be relative to cryptofs root */
-	return NULL;
+	g_string_append(ret, root);
     }
 
     names = g_strsplit(namep, "/", -1);

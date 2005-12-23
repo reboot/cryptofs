@@ -13,7 +13,7 @@ liblufs_cryptofs_la_CFLAGS = \
 	$(GLIB_CFLAGS)
 
 liblufs_cryptofs_la_LDFLAGS = \
-	-version-info 0:4:0
+	-version-info 0:5:0
 
 liblufs_cryptofs_la_LIBADD = \
 	$(LIBGCRYPT_LIBS) \

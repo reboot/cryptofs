@@ -16,6 +16,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+/* #define DEBUG */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -71,6 +73,10 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 
 	*global_ctx = crypto_create_global_ctx(cipheralgo, mdalgo, fileblocksize, num_of_salts, root);
 	g_free(root);
+	if (*global_ctx == NULL) {
+	    TRACE("creating global context failed");
+	    return NULL;
+	}
     }
 
     return crypto_create_local_ctx(*global_ctx);
@@ -117,7 +123,10 @@ int cryptofs_stat(void *ctx, char *name, struct lufs_fattr *fattr)
     gchar *transname;
     gint ret;
 
+    TRACE("stating file %s", name);
+
     transname = crypto_translate_path(ctx, name);
+    TRACE("translated to %s", transname);
 
     ret = lufs_stat(ctx, transname, fattr);
 
