@@ -12,7 +12,7 @@
     	    </affiliation>
 	</author>
 	<copyright>
-    	    <year>2003</year>
+    	    <year>2003-2006</year>
     	    <holder>Christoph Hohmann</holder>
 	</copyright>
     </articleinfo>
@@ -69,6 +69,17 @@
 	    url="http://www.gtk.org">http://www.gtk.org</ulink>
 	    (version >= 2.2). You must have installed these packages
 	    correctly before running CryptoFS's "configure" script.
+	</para>
+	<para>
+	    Optionally CryptoFS can use the <ulink
+	    url="ftp://ftp.gnupg.org/gcrypt/pinentry/">PIN Entry</ulink>
+	    utility by <ulink url="http://www.gnupg.org/">GnuPG</ulink>
+	    to ask the user for the filesystem's password. If the pinentry
+	    program is found on the system CryptoFS will be automatically
+	    built with PIN Entry support. Otherwise it will fall back
+	    to the old console input method. You can force PIN Entry
+	    support using the --with-pinentry or --without-pinentry
+	    configure option.
 	</para>
     </sect1>
 
