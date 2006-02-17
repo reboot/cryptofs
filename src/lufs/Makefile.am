@@ -12,5 +12,5 @@ liblufs_cryptofs_la_LDFLAGS = \
 	-version-info 0:6:0 -no-undefined
 
 liblufs_cryptofs_la_LIBADD = \
-	../cryptofs/libcryptofs.la \
+	$(top_builddir)/src/cryptofs/libcryptofs.la \
 	$(GLIB_LIBS)

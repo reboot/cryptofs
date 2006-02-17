@@ -19,23 +19,29 @@
     <sect1>
     	<title>What's CryptoFS</title>
 	<para>
-	    CryptoFS is a encrypted filesystem for the Linux Userland FileSystem.
-	    For more information on the Linux Userland Filesystem visit
-	    <ulink url="http://lufs.sourceforge.net/lufs/">http://lufs.sourceforge.net/lufs/</ulink>
+	    CryptoFS is a encrypted filesystem for Filesystem in Userspace
+	    (FUSE) and the Linux Userland FileSystem (LUFS).  Visit <ulink
+	    url="http://fuse.sourceforge.net/">http://fuse.sourceforge.net/</ulink>
+	    for more information on FUSE or <ulink
+	    url="http://lufs.sourceforge.net/lufs/">http://lufs.sourceforge.net/lufs/</ulink>
+	    for more information on LUFS.
 	</para>
         <para>
-    	    CryptoFS will use a normal directory to store files encrypted.
-	    The mountpoint will contain the decrypted files. Every file stored
-	    in this mountpoint will be written encrypted (data and filename)
-	    to the directory that was mounted. If you unmount the directory the
-	    encrypted data can only be access by mounting the directory with
-	    the correct key again. Like other LUFS filesystems it does not need
-	    root access or any complicated setup like creating a filesystem on
-	    a encrypted disk using the loop device.
+	    CryptoFS will use a normal directory to store files encrypted.
+	    The mountpoint will contain the decrypted files. Every file
+	    stored in this mountpoint will be written encrypted (data
+	    and filename) to the directory that was mounted. If you
+	    unmount the directory the encrypted data can only be access
+	    by mounting the directory with the correct key again. Like
+	    other FUSE/LUFS filesystems it does not need root access
+	    or any complicated setup like creating a filesystem on a
+	    encrypted disk using the loop device.
         </para>
 	<para>
-	    This package will create a shared library that can be used by LUFS's lufsd
-	    to mount a directory containing encrypted data to another directory.
+	    CryptoFS can be build for FUSE and LUFS. When you build for
+	    FUSE you get a program to mount the filesystem. For LUFS a
+	    shared library will be built that can be used by LUFS's lufsd.
+	    Both methods can use the same encrypted directory.
 	</para>
     </sect1>
 
@@ -50,24 +56,38 @@
 	    to mount any directory as an encrypted storage without having root
 	    access and creating a crypto filesystem using the loop device. So
 	    when I found no other program that offers this posibilities I started
-	    to write my own filesystem for LUFS.
+	    to write my own filesystem for LUFS. Unfortunately LUFS seems to be
+	    dead too, so CryptoFS can now be build for FUSE too which has already
+	    made it into the official Linux kernel package.
 	</para>
     </sect1>
 
     <sect1>
 	<title>Requirements</title>
 	<para>
-	    You have to install the LUFS package from <ulink url="http://lufs.sourceforge.net/lufs/">
-	    http://lufs.sourceforge.net/lufs/</ulink>
-	    This steps will not be explained here. CryptoFS is only an addon to
-	    it.
+	    You either need FUSE or LUFS to use CryptoFS.
+	    For FUSE you need the FUSE tools, library and
+	    kernel module.  You also need the FUSE development
+	    files to build the FUSE filesystem. See <ulink
+	    url="http://fuse.sourceforge.net/">http://fuse.sourceforge.net/</ulink>
+	    for more information and downloads. If you don't want to build
+	    CryptoFS for FUSE you can use the --disable-fuse configure
+	    switch. Otherwise it will be build when the development files
+	    are found on the system. For LUFS you only have to install
+	    the LUFS tools and load the LUFS kernel module. See <ulink
+	    url="http://lufs.sourceforge.net/lufs/">http://lufs.sourceforge.net/lufs/</ulink>
+	    on how to do this and downloads for LUFS. If you want
+	    to disable building CryptoFS for LUFS you can use the
+	    --disable-lufs configure switch.  As the LUFS module has no
+	    requirements it will be build by default.	 Installing and
+	    setting up LUFS and FUSE will not be covered by this document.
 	</para>
 	<para>
 	    CryptoFS uses Libgcrypt from <ulink
 	    url="ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/">ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/</ulink>
 	    (version >= 1.1.44) and GLib from <ulink
 	    url="http://www.gtk.org">http://www.gtk.org</ulink>
-	    (version >= 2.2). You must have installed these packages
+	    (version >= 2.6). You must have installed these packages
 	    correctly before running CryptoFS's "configure" script.
 	</para>
 	<para>
@@ -77,27 +97,34 @@
 	    to ask the user for the filesystem's password. If the pinentry
 	    program is found on the system CryptoFS will be automatically
 	    built with PIN Entry support. Otherwise it will fall back
-	    to the old console input method. You can force PIN Entry
-	    support using the --with-pinentry or --without-pinentry
-	    configure option.
+	    to the old console input method.
 	</para>
     </sect1>
 
     <sect1>
 	<title>Usage</title>
+        <para>
+	    First you have to set up the source directory by copying
+	    the file cryptofs.conf to &lt;source&gt;/.cryptofs. Where
+	    &lt;source&gt; is the directory where you want to store
+	    the encryted files. You can adjust the values in the file,
+	    but the default should work fine.
+	</para>
 	<para>
-    	    Put the shared library into a directory where the system linker can find
+	    For FUSE you have to run cryptofs that should be in an executeable
+	    path after "make install". The required options are
+	    <programlisting><![CDATA[     cryptofs --root=<source> <dest> ]]></programlisting>
+	    &lt;dest&gt; is the directory where the filesystem containing
+	    the decrypted files will be mounted.
+	</para>
+	<para>		    
+    	    For LUFS put the shared library into a directory where the system linker can find
 	    it (this will usually be done by "make install") or add the directory
 	    to the search path by setting the LD_LIBRARY_PATH environment varibale.
 	</para>
-        <para>
-	    First you have to set up the source directory by copying the file
-	    cryptofs.conf to &lt;source&gt;/.cryptofs. You can adjust the values in the
-	    file, but the default should work fine.
-	</para>
 	<para>
 	    After that you can mount the source directory with
-	    lufsmount cryptofs://&lt;source&gt; &lt;dest&gt;
+	    <programlisting><![CDATA[     lufsmount cryptofs://<source> <dest> ]]></programlisting>
 	</para>
 	<para>
 	    You will be asked for the password you want to use for this filesystem. It
@@ -119,7 +146,7 @@
 		These are
 		<variablelist>
 		    <varlistentry>
-			<term>CRYPTOFS::cipher</term>
+			<term>cipher</term>
 			<listitem>
 			    <para>
 				The cipher algorithm used to encrypt files and filenames.
@@ -128,7 +155,7 @@
 			</listitem>
 		    </varlistentry>
 		    <varlistentry>
-			<term>CRYPTOFS::md</term>
+			<term>md</term>
 			<listitem>
 			    <para>
 				The message digest algorithm used to generate the cipher
@@ -138,7 +165,7 @@
 			</listitem>
 		    </varlistentry>
 		    <varlistentry>
-			<term>CRYPTOFS::blocksize</term>
+			<term>blocksize</term>
 			<listitem>
 			    <para>
 				An encrypted file can not be randomly accessed like a normal
@@ -147,7 +174,7 @@
 			</listitem>
 		    </varlistentry>
 		    <varlistentry>
-			<term>CRYPTOFS::salts</term>
+			<term>salts</term>
 			<listitem>
 			    <para>
 				This is the number of subkeys CryptoFS will generate to
@@ -156,21 +183,25 @@
 			</listitem>
 		    </varlistentry>
 		</variablelist>
+		<emphasis>NOTE:</emphasis> Before 0.4.0 CryptoFS used a different config file format.
+		The LUFS module can still read this format. The FUSE program only supports
+		the new format. If you want to switch from LUFS to FUSE you have to
+	        replace .cryptofs with a file in the new format.
 	    </para>
 	</sect2>
 	<sect2>
 	    <title>Encryption</title>
 	    <para>
 		When a filesystem is mounted CryptoFS first generates a key for the
-		requested cipher algorithm (CRYPTOFS::cipher) using the message
-		digest function (CRYPTOFS::md). Every algorithm has a specific key size
+		requested cipher algorithm (cipher option) using the message
+		digest function (md option). Every algorithm has a specific key size
 		and every message digest function has a specific length of the
 		generated message digest. If the message digest size is smaller then
 		the keysize the message digest will be repeated until the key size
 		is reached.
 	    </para>
 	    <para>
-		After they primary key has been generated CRYPTOFS::salts subkeys
+		After they primary key has been generated n (= salts option= subkeys
 		(initialization vectors) will be generated by encrypting 0 bytes with
 		a 0 initialization vector. These will later be used to encrypt blocks
 		with different subkeys to make sure the cipher text will first repeat

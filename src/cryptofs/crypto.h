@@ -22,12 +22,14 @@
 typedef struct _CryptoCtxGlobal	CryptoCtxGlobal;
 typedef struct _CryptoCtxLocal	CryptoCtxLocal;
 
+#include <glib.h>
+
 CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int salts);
 CryptoCtxLocal *crypto_create_local_ctx(CryptoCtxGlobal *gctx);
 void crypto_destroy_local_ctx(CryptoCtxLocal *ctx);
-char *crypto_encrypt_name(CryptoCtxLocal *ctx, char *name);
-char *crypto_decrypt_name(CryptoCtxLocal *ctx, char *name);
-char *crypto_translate_path(CryptoCtxLocal *ctx, char *name);
+char *crypto_encrypt_name(CryptoCtxLocal *ctx, const char *name);
+char *crypto_decrypt_name(CryptoCtxLocal *ctx, const char *name);
+char *crypto_translate_path(CryptoCtxLocal *ctx, const char *name);
 int crypto_get_blocksize(CryptoCtxLocal *ctx);
 void *crypto_get_filebuf(CryptoCtxLocal *ctx);
 int crypto_readblock(CryptoCtxLocal *ctx, int fp, int block);

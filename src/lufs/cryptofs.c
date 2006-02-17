@@ -106,30 +106,33 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 
 	root = lu_opt_getchar(cfg, "MOUNT", "root");
 
-	cryptofs_cfg = g_strconcat(root, "/.cryptofs", NULL);
-	if (lu_opt_loadcfg(cfg, cryptofs_cfg) < 0) {
-	    printf("cryptofs cfg not found");
-	    g_free(cryptofs_cfg);
-	    return NULL;
+	cryptofs_cfg = g_strconcat(root, G_DIR_SEPARATOR_S, ".cryptofs", NULL);
+	if (!read_config(cryptofs_cfg, &cipheralgo, &mdalgo, &fileblocksize, &num_of_salts)) {
+	    /* Try old config file */
+	    if (lu_opt_loadcfg(cfg, cryptofs_cfg) < 0) {
+		printf("cryptofs cfg not found");
+	        g_free(cryptofs_cfg);
+	        return NULL;
+	    }
+
+	    if ((cipheralgo = lu_opt_getchar(cfg, "CRYPTOFS", "cipher")) == NULL) {
+    		printf("CRYPTOFS::cipher missing in config file\n");
+    	        return NULL;
+	    }
+	    if ((mdalgo = lu_opt_getchar(cfg, "CRYPTOFS", "md")) == NULL) {
+		printf("CRYPTOFS::md missing in config file\n");
+	        return NULL;
+	    }
+	    if (lu_opt_getint(cfg, "CRYPTOFS", "blocksize", &fileblocksize, 0) < 0) {
+		printf("CRYPTOFS::blocksize missing in config file\n");
+	        return NULL;
+	    }
+	    if (lu_opt_getint(cfg, "CRYPTOFS", "salts", &num_of_salts, 0) < 0) {
+		printf("CRYPTOFS::salts missing in config file\n");
+		return NULL;
+	    }
 	}
         g_free(cryptofs_cfg);
-
-	if ((cipheralgo = lu_opt_getchar(cfg, "CRYPTOFS", "cipher")) == NULL) {
-    	    printf("CRYPTOFS::cipher missing in config file\n");
-    	    return NULL;
-	}
-	if ((mdalgo = lu_opt_getchar(cfg, "CRYPTOFS", "md")) == NULL) {
-	    printf("CRYPTOFS::md missing in config file\n");
-	    return NULL;
-	}
-	if (lu_opt_getint(cfg, "CRYPTOFS", "blocksize", &fileblocksize, 0) < 0) {
-	    printf("CRYPTOFS::blocksize missing in config file\n");
-	    return NULL;
-	}
-	if (lu_opt_getint(cfg, "CRYPTOFS", "salts", &num_of_salts, 0) < 0) {
-	    printf("CRYPTOFS::salts missing in config file\n");
-	    return NULL;
-	}
 
 	*global_ctx = crypto_create_global_ctx(cipheralgo, mdalgo, fileblocksize, num_of_salts);
 	if (*global_ctx == NULL) {
@@ -365,7 +368,7 @@ int cryptofs_readlink(Ctx *ctx, char *_link, char *buf, int buflen)
     	    tmpbufp++;
 	}
 
-	names = g_strsplit(tmpbufp, "/", -1);
+	names = g_strsplit(tmpbufp, G_DIR_SEPARATOR_S, -1);
 	for (cur = names; *cur != NULL; cur++) {
 	    gchar *decname;
 
@@ -373,7 +376,7 @@ int cryptofs_readlink(Ctx *ctx, char *_link, char *buf, int buflen)
 	    if (decname == NULL)
 		continue;
 	    if (target->len > 0 || abspath)
-		g_string_append(target, "/");
+		g_string_append(target, G_DIR_SEPARATOR_S);
 	    g_string_append(target, decname);
 	    g_free(decname);
 	}

@@ -55,3 +55,37 @@ char *reads(int fd)
     return result;
 }
 
+gboolean read_config(const gchar *file, gchar **cipheralgo, gchar **mdalgo, long int *fileblocksize, long int *salts)
+{
+    GKeyFile *kf;
+
+    kf = g_key_file_new();
+
+    do {
+	if (!g_key_file_load_from_file(kf, file, G_KEY_FILE_NONE, NULL))
+	    break;
+
+	if (!g_key_file_has_group(kf, CONF_GROUP_NAME))
+	    break;
+
+	if (!g_key_file_has_key(kf, CONF_GROUP_NAME, "cipher", NULL))
+	    break;
+	if (!g_key_file_has_key(kf, CONF_GROUP_NAME, "md", NULL))
+	    break;
+	if (!g_key_file_has_key(kf, CONF_GROUP_NAME, "blocksize", NULL))
+	    break;
+	if (!g_key_file_has_key(kf, CONF_GROUP_NAME, "salts", NULL))
+	    break;
+
+	*cipheralgo = g_key_file_get_string(kf, CONF_GROUP_NAME, "cipher", NULL);
+	*mdalgo = g_key_file_get_string(kf, CONF_GROUP_NAME, "md", NULL);
+	*fileblocksize = g_key_file_get_integer(kf, CONF_GROUP_NAME, "blocksize", NULL);
+	*salts = g_key_file_get_integer(kf, CONF_GROUP_NAME, "salts", NULL);
+
+	g_key_file_free(kf);
+	return TRUE;
+    } while(FALSE);
+
+    g_key_file_free(kf);
+    return FALSE;
+}

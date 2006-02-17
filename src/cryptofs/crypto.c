@@ -29,6 +29,7 @@
 
 #include "crypto.h"
 #include "base64.h"
+#include "utils.h"
 #ifndef WITH_PINENTRY
 #  include "getpw.h"
 #else
@@ -174,7 +175,7 @@ void crypto_destroy_local_ctx(CryptoCtxLocal *ctx)
     g_free(ctx);
 }
 
-char *crypto_encrypt_name(CryptoCtxLocal *ctx, char *name)
+char *crypto_encrypt_name(CryptoCtxLocal *ctx, const char *name)
 {
     gchar *tmpname, *ret;
     int len;
@@ -206,7 +207,7 @@ char *crypto_encrypt_name(CryptoCtxLocal *ctx, char *name)
     return ret;
 }
 
-char *crypto_decrypt_name(CryptoCtxLocal *ctx, char *name)
+char *crypto_decrypt_name(CryptoCtxLocal *ctx, const char *name)
 {
     char *tmpname, *ret;
     int len;
@@ -236,7 +237,7 @@ char *crypto_decrypt_name(CryptoCtxLocal *ctx, char *name)
     return ret;
 }
 
-char *crypto_translate_path(CryptoCtxLocal *ctx, char *path)
+char *crypto_translate_path(CryptoCtxLocal *ctx, const char *path)
 {
     GString *ret;
     gchar *retstr;

@@ -19,7 +19,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#define CONF_GROUP_NAME "CryptoFS"
+
 void writes(int fs, char *str);
 char *reads(int fd);
+gboolean read_config(const gchar *file, gchar **cipheralgo, gchar **mdalgo, long int *fileblocksize, long int *salts);
 
 #endif
