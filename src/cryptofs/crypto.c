@@ -255,7 +255,7 @@ char *crypto_translate_path(CryptoCtxLocal *ctx, const char *path)
 	encname = crypto_encrypt_name(ctx, *cur);
 	if (encname == NULL)
 	    continue;
-	if (ret->len > 0)
+	if (cur != names)
 	    g_string_append(ret, "/");
 	g_string_append(ret, encname);
 	g_free(encname);
@@ -280,7 +280,7 @@ void *crypto_get_filebuf(CryptoCtxLocal *ctx)
 
 int crypto_readblock(CryptoCtxLocal *ctx, int fp, int block)
 {
-    unsigned long res;
+    int res;
 
     if (lseek(fp, block * ctx->global->fileblocksize, SEEK_SET) < 0)
 	return -1;

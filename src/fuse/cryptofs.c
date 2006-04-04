@@ -340,9 +340,15 @@ static int cryptofs_open(const char *_path, struct fuse_file_info *fi)
 {
     gchar *path;
     int fd;
+    int flags;
 
     path = translate_path(get_ctx(), _path);
-    fd = open(path, fi->flags);
+    flags = fi->flags;
+    if(flags & O_WRONLY){
+    	flags &= ~O_WRONLY;
+	flags |= O_RDWR;
+    }
+    fd = open(path, flags);
     g_free(path);
     if(fd == -1)
         return -errno;

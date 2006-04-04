@@ -1,3 +1,7 @@
+Version 0.5.1
+
+* Bugfix if file was opened in write only mode by user
+
 Version 0.3.1
 
 * Code seperation
