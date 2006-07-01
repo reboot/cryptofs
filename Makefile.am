@@ -1,4 +1,4 @@
-SUBDIRS = config src doc
+SUBDIRS = config src doc tests
 
 EXTRA_DIST = cryptofs.conf
 

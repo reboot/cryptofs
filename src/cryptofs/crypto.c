@@ -27,14 +27,10 @@
 #include <glib.h>
 #include <gcrypt.h>
 
+#include "cryptofs.h"
 #include "crypto.h"
 #include "base64.h"
 #include "utils.h"
-#ifndef WITH_PINENTRY
-#  include "getpw.h"
-#else
-#  include "pinentry.h"
-#endif
 
 struct _CryptoCtxGlobal {
     int				  count;
@@ -91,7 +87,7 @@ static gcry_cipher_hd_t open_cipher(CryptoCtxGlobal *gctx, int cipher)
     return cipherhd;
 }
 
-CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int num_of_salts)
+CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int num_of_salts, PasswordQuery *query)
 {
     int cipher, md, i;
     char *pass;
@@ -104,11 +100,7 @@ CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *
     cipher = gcry_cipher_map_name(cipheralgo);
     md = gcry_md_map_name(mdalgo);
 
-#ifndef WITH_PINENTRY
-    pass = getpwd("Enter password:");
-#else
-    pass = getpin("Enter password for filesystem", "Password:");
-#endif
+    pass = query->getPassword();
     if (pass == NULL)
 	return NULL;
 
@@ -118,12 +110,7 @@ CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *
     gctx->num_of_salts = num_of_salts;
 
     generate_key(gctx->cipher, md, pass, &gctx->key, &gctx->keylen);
-#ifndef WITH_PINENTRY
-    putpwd(pass);
-#else
-    memset(pass, '\0', strlen(pass));
-    g_free(pass);
-#endif
+    query->freePassword(pass);
 
     cipher_hd = open_cipher(gctx, gctx->cipher);
     gcry_cipher_algo_info(gctx->cipher, GCRYCTL_GET_BLKLEN, NULL, &gctx->blocksize);
@@ -138,6 +125,11 @@ CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *
     cipher_hd = NULL;
 
     return gctx;
+}
+
+CryptoCtxGlobal *crypto_create_global_ctx_default(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int num_of_salts)
+{
+    return crypto_create_global_ctx(cipheralgo, mdalgo, fileblocksize, num_of_salts, getDefaultPasswordQuery());
 }
 
 CryptoCtxLocal *crypto_create_local_ctx(CryptoCtxGlobal *gctx)
@@ -175,6 +167,8 @@ void crypto_destroy_local_ctx(CryptoCtxLocal *ctx)
     g_free(ctx);
 }
 
+#define CONFIGFILE_REPLACEMENT ".!ryptofs"
+
 char *crypto_encrypt_name(CryptoCtxLocal *ctx, const char *name)
 {
     gchar *tmpname, *ret;
@@ -204,6 +198,11 @@ char *crypto_encrypt_name(CryptoCtxLocal *ctx, const char *name)
 
     *(ret + len + (hidden ? 1 : 0)) = '\0';
 
+    if (strcmp(ret, CONFIGFILE) == 0) {
+	g_free(ret);
+	ret = g_strdup(CONFIGFILE_REPLACEMENT);
+    }
+
     return ret;
 }
 
@@ -219,6 +218,9 @@ char *crypto_decrypt_name(CryptoCtxLocal *ctx, const char *name)
 
     if (!strcmp(name, ".") || !strcmp(name, ".."))
 	return g_strdup(name);
+
+    if (strcmp(name, CONFIGFILE_REPLACEMENT) == 0)
+	name = CONFIGFILE;
 
     if (name[0] == '.')
 	hidden = TRUE;

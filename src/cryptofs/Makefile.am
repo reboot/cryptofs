@@ -7,6 +7,8 @@ PASSWORD_SOURCES = getpw.c getpw.h
 endif
 
 libcryptofs_la_SOURCES = \
+	cryptofs.h \
+	passwordquery.h \
 	base64.c base64.h \
 	crypto.c crypto.h \
 	utils.c utils.h \

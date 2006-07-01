@@ -30,6 +30,7 @@
 #include <fs.h>
 #include <proto.h>
 
+#include "cryptofs.h"
 #include "crypto.h"
 
 typedef struct _Ctx Ctx;
@@ -106,7 +107,7 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 
 	root = lu_opt_getchar(cfg, "MOUNT", "root");
 
-	cryptofs_cfg = g_strconcat(root, G_DIR_SEPARATOR_S, ".cryptofs", NULL);
+	cryptofs_cfg = g_strconcat(root, G_DIR_SEPARATOR_S, CONFIGFILE, NULL);
 	if (!read_config(cryptofs_cfg, &cipheralgo, &mdalgo, &fileblocksize, &num_of_salts)) {
 	    /* Try old config file */
 	    if (lu_opt_loadcfg(cfg, cryptofs_cfg) < 0) {
@@ -134,7 +135,7 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 	}
         g_free(cryptofs_cfg);
 
-	*global_ctx = crypto_create_global_ctx(cipheralgo, mdalgo, fileblocksize, num_of_salts);
+	*global_ctx = crypto_create_global_ctx_default(cipheralgo, mdalgo, fileblocksize, num_of_salts);
 	if (*global_ctx == NULL) {
 	    TRACE("creating global context failed");
 	    return NULL;
@@ -218,7 +219,7 @@ int cryptofs_readdir(Ctx *ctx, char *_dir_name, struct directory *ddir)
             return -1;
         }
 
-	if (!strcmp(dent->d_name, ".cryptofs"))
+	if (!strcmp(dent->d_name, CONFIGFILE))
 	    continue;
         
 	decname = crypto_decrypt_name(ctx->cryptoctx, dent->d_name);

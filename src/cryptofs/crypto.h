@@ -24,7 +24,10 @@ typedef struct _CryptoCtxLocal	CryptoCtxLocal;
 
 #include <glib.h>
 
-CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int salts);
+#include "passwordquery.h"
+
+CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int salts, PasswordQuery *query);
+CryptoCtxGlobal *crypto_create_global_ctx_default(const gchar *cipheralgo, const gchar *mdalgo, long int fileblocksize, long int salts);
 CryptoCtxLocal *crypto_create_local_ctx(CryptoCtxGlobal *gctx);
 void crypto_destroy_local_ctx(CryptoCtxLocal *ctx);
 char *crypto_encrypt_name(CryptoCtxLocal *ctx, const char *name);

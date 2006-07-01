@@ -23,6 +23,7 @@
 #include <glib.h>
 
 #include "utils.h"
+#include "passwordquery.h"
 
 char *args[] = {
     "pinentry",
@@ -93,4 +94,26 @@ char *getpin(char *desc, char *prompt)
     close(childout);
 
     return ret;
+}
+
+static char *getPassword(void)
+{
+    return getpin("Enter password for filesystem", "Password:");
+}
+
+static void freePassword(char *password)
+{
+    memset(password, '\0', strlen(password));
+    g_free(password);
+}
+
+static PasswordQuery query =
+{
+    getPassword,
+    freePassword
+};
+
+PasswordQuery *getDefaultPasswordQuery(void)
+{
+	return &query;
 }

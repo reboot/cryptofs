@@ -1,3 +1,9 @@
+Version 0.5.2
+
+* Don't show the config file in the directory listing of FUSE mountpoints
+* Workaround for possible config overwriting
+* Add automatic tests
+
 Version 0.5.1
 
 * Bugfix if file was opened in write only mode by user

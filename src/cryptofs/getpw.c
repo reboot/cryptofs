@@ -74,3 +74,26 @@ void	sfree(void *p)
 	munlock(p, *q);
 	free(q);
 }
+
+#include "passwordquery.h"
+
+static char *getPassword(void)
+{
+    return getpwd("Enter password:");
+}
+
+static void freePassword(char *password)
+{
+    putpwd(password);
+}
+
+static PasswordQuery query =
+{
+    getPassword,
+    freePassword
+};
+
+PasswordQuery *getDefaultPasswordQuery(void)
+{
+	return &query;
+}

@@ -31,6 +31,7 @@
 #include <sys/statfs.h>
 #include <pthread.h>
 
+#include "cryptofs.h"
 #include "crypto.h"
 #include "utils.h"
 
@@ -142,11 +143,19 @@ static int cryptofs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     gchar *decname;
     DIR *dp = (DIR *) fi->fh;
     struct dirent *de;
+    gboolean is_root_dir = FALSE;
 
-    (void) path;
+    if(strlen(path) == 1 && path[0] == '/')
+	is_root_dir = TRUE;
+
     seekdir(dp, offset);
     while ((de = readdir(dp)) != NULL) {
         struct stat st;
+
+	// skip the config file
+	if(is_root_dir && strcmp(de->d_name, CONFIGFILE) == 0)
+	    continue;
+
         memset(&st, 0, sizeof(st));
         st.st_ino = de->d_ino;
         st.st_mode = de->d_type << 12;
@@ -344,7 +353,7 @@ static int cryptofs_open(const char *_path, struct fuse_file_info *fi)
 
     path = translate_path(get_ctx(), _path);
     flags = fi->flags;
-    if(flags & O_WRONLY){
+    if(flags & O_WRONLY) {
     	flags &= ~O_WRONLY;
 	flags |= O_RDWR;
     }
@@ -475,15 +484,15 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    cryptofs_cfg = g_strconcat(rootpath, G_DIR_SEPARATOR_S, ".cryptofs", NULL);
+    cryptofs_cfg = g_strconcat(rootpath, G_DIR_SEPARATOR_S, CONFIGFILE, NULL);
     if (!read_config(cryptofs_cfg, &cipheralgo, &mdalgo, &fileblocksize, &num_of_salts)) {
 	fprintf(stderr, "Could not read config for encrypted directory\n"
-			"Check that %s/.cryptofs is available and correct\n", rootpath);
+			"Check that %s/" CONFIGFILE " is available and correct\n", rootpath);
 	exit(1);
     }
     g_free(cryptofs_cfg);
 
-    global_ctx = crypto_create_global_ctx(cipheralgo, mdalgo, fileblocksize, num_of_salts);
+    global_ctx = crypto_create_global_ctx_default(cipheralgo, mdalgo, fileblocksize, num_of_salts);
     pthread_key_create(&context_key, (freeFunc) crypto_destroy_local_ctx);
 
     return fuse_main(argc, argv, &cryptofs_oper);
