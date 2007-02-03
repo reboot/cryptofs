@@ -1,3 +1,7 @@
+Version 0.6.0
+
+* MacFUSE compatibility
+
 Version 0.5.2
 
 * Don't show the config file in the directory listing of FUSE mountpoints

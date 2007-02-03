@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Christoph Hohmann
+ * Copyright (C) 2007 Christoph Hohmann
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,16 +16,33 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#include <fuse.h>
+
 #include "libtest.h"
+#include "fs.h"
 
 int test()
 {
     CryptoCtxLocal *context;
+    struct fuse_operations *ops;
+    mode_t mode;
 
-    context = getLocalTestContext();
-    if (context == NULL)
+    fs_init(".", getGlobalTestContext());
+    ops = fs_get_fuse_operations();
+
+    mode = S_IFREG;
+    if (ops->mknod("test", mode, 0) < 0) {
+	perror("Cound not create file");
 	return 1;
-    crypto_destroy_local_ctx(context);
+    }
+
+    unlink("kjKk7g==");
 
     return 0;
 }

@@ -16,16 +16,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include "libtest.h"
+#ifndef LIB_H
+#define LIB_H 1
 
-int test()
-{
-    CryptoCtxLocal *context;
+#include "crypto.h"
 
-    context = getLocalTestContext();
-    if (context == NULL)
-	return 1;
-    crypto_destroy_local_ctx(context);
+CryptoCtxGlobal *getGlobalTestContext();
+CryptoCtxLocal *getLocalTestContext();
 
-    return 0;
-}
+int test();
+
+#endif /* LIB_H */

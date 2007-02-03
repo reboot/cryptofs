@@ -16,16 +16,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#include "libtest.h"
+#ifndef FS_H
+#define FS_H 1
 
-int test()
-{
-    CryptoCtxLocal *context;
+#include <fuse.h>
 
-    context = getLocalTestContext();
-    if (context == NULL)
-	return 1;
-    crypto_destroy_local_ctx(context);
+void fs_init(gchar *_rootpath, CryptoCtxGlobal *_global_ctx);
+struct fuse_operations *fs_get_fuse_operations();
 
-    return 0;
-}
+#endif /* FS_H */
