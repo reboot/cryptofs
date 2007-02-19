@@ -18,6 +18,7 @@ libtest_la_SOURCES = \
 	libtest.c libtest.h
 
 libtest_la_CFLAGS = \
+	-D_FILE_OFFSET_BITS=64 \
 	-I$(top_srcdir)/src/cryptofs \
 	$(GLIB_CFLAGS)
 

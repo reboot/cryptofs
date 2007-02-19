@@ -15,6 +15,7 @@ libcryptofs_la_SOURCES = \
 	$(PASSWORD_SOURCES)
 
 libcryptofs_la_CFLAGS = \
+	-D_FILE_OFFSET_BITS=64 \
 	$(LIBGCRYPT_CFLAGS) \
 	$(GLIB_CFLAGS)
 

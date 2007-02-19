@@ -22,6 +22,8 @@
 typedef struct _CryptoCtxGlobal	CryptoCtxGlobal;
 typedef struct _CryptoCtxLocal	CryptoCtxLocal;
 
+#include <sys/types.h>
+
 #include <glib.h>
 
 #include "passwordquery.h"
@@ -35,9 +37,9 @@ char *crypto_decrypt_name(CryptoCtxLocal *ctx, const char *name);
 char *crypto_translate_path(CryptoCtxLocal *ctx, const char *name);
 int crypto_get_blocksize(CryptoCtxLocal *ctx);
 void *crypto_get_filebuf(CryptoCtxLocal *ctx);
-int crypto_readblock(CryptoCtxLocal *ctx, int fp, int block);
-int crypto_writeblock(CryptoCtxLocal *ctx, int fp, int block, unsigned long size);
-int crypto_read(CryptoCtxLocal *ctx, int fp, void *buf, unsigned long size, long long offset);
-int crypto_write(CryptoCtxLocal *ctx, int fp, void *buf, unsigned long count, long long offset);
+int crypto_readblock(CryptoCtxLocal *ctx, int fp, long long block);
+int crypto_writeblock(CryptoCtxLocal *ctx, int fp, long long block, size_t size);
+int crypto_read(CryptoCtxLocal *ctx, int fp, void *buf, size_t size, off_t offset);
+int crypto_write(CryptoCtxLocal *ctx, int fp, void *buf, size_t count, off_t offset);
 
 #endif

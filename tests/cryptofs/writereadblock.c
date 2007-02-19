@@ -77,5 +77,8 @@ int test()
 	unlink(FILENAME);
     }
 
+    free(block);
+    crypto_destroy_local_ctx(context);
+
     return 0;
 }

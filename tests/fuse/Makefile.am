@@ -4,7 +4,7 @@ TESTS = \
 check_PROGRAMS = $(TESTS)
 
 AM_CFLAGS = \
-	-DFUSE_USE_VERSION=25 \
+	-DFUSE_USE_VERSION=26 \
 	-I$(top_srcdir)/src/cryptofs \
 	-I$(top_srcdir)/src/fuse \
 	-I$(top_srcdir)/tests \

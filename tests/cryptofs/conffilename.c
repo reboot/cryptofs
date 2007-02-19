@@ -55,5 +55,7 @@ int test()
     g_free(encname);
     g_free(decname);    
 
+    crypto_destroy_local_ctx(context);
+
     return 0;
 }

@@ -1,3 +1,10 @@
+Version 0.6.1
+
+* Update FUSE filesystem to version 2.6
+* Fix 2 file writing bugs 
+* Fix symlinks in FUSE filesystem
+* Support for large files (>2GB)
+
 Version 0.6.0
 
 * MacFUSE compatibility

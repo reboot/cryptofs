@@ -32,6 +32,7 @@
 
 #include "cryptofs.h"
 #include "crypto.h"
+#include "utils.h"
 
 typedef struct _Ctx Ctx;
 
@@ -101,7 +102,7 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
     if (!(*global_ctx)) {
 	gchar *cryptofs_cfg;
 	const char *root;
-	const char *cipheralgo, *mdalgo;
+	const gchar *cipheralgo, *mdalgo;
 	long int fileblocksize;
 	long int num_of_salts;
 

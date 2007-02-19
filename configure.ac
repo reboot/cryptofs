@@ -2,7 +2,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT(configure.ac)
 AC_CONFIG_AUX_DIR(config)
 AC_CANONICAL_TARGET
-AM_INIT_AUTOMAKE(cryptofs, 0.6.0)
+AM_INIT_AUTOMAKE(cryptofs, 0.6.1)
 AM_CONFIG_HEADER(config.h)
 
 AC_PROG_CC
@@ -31,7 +31,7 @@ AC_ARG_ENABLE(fuse,
 	      [  --disable-fuse          don't build CryptoFS for FUSE ], 
 	      [ enable_fuse=$enableval ])
 if test x"$enable_fuse" != x"no"; then
-    PKG_CHECK_MODULES(FUSE, [ fuse ], [], [ enable_fuse="no" ])
+    PKG_CHECK_MODULES(FUSE, [ fuse >= 2.6.0 ], [], [ enable_fuse="no" ])
 fi
 AM_CONDITIONAL(BUILD_FUSE, [ test x"$enable_fuse" != x"no" ])
 

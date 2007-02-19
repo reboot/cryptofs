@@ -32,6 +32,8 @@
 #else
 #include <sys/statfs.h>
 #endif /* BSD */
+#include <sys/time.h>
+
 #include <pthread.h>
 
 #include <fuse.h>
@@ -79,6 +81,35 @@ static int cryptofs_getattr(const char *_path, struct stat *stbuf)
     res = lstat(path, stbuf);
     g_free(path);
     if(res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int cryptofs_fgetattr(const char *path, struct stat *stbuf,
+                    	     struct fuse_file_info *fi)
+{
+    int res;
+
+    (void) path;
+
+    res = fstat(fi->fh, stbuf);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int cryptofs_access(const char *_path, int mask)
+{
+    gchar *path;
+    int res;
+
+    path = translate_path(get_ctx(), _path);
+
+    res = access(path, mask);
+    g_free(path);
+    if (res == -1)
         return -errno;
 
     return 0;
@@ -143,11 +174,16 @@ static int cryptofs_opendir(const char *_path, struct fuse_file_info *fi)
     return 0;
 }
 
+static inline DIR *get_dirp(struct fuse_file_info *fi)
+{
+    return (DIR *) (uintptr_t) fi->fh;
+}
+
 static int cryptofs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi)
 {
     gchar *decname;
-    DIR *dp = (DIR *) fi->fh;
+    DIR *dp = get_dirp(fi);
     struct dirent *de;
     gboolean is_root_dir = FALSE;
 
@@ -178,7 +214,7 @@ static int cryptofs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int cryptofs_releasedir(const char *path, struct fuse_file_info *fi)
 {
-    DIR *dp = (DIR *) fi->fh;
+    DIR *dp = get_dirp(fi);
     (void) path;
     closedir(dp);
     return 0;
@@ -256,7 +292,7 @@ static int cryptofs_symlink(const char *_from, const char *_to)
     CryptoCtxLocal *ctx;
 
     ctx = get_ctx();
-    from = translate_path(ctx, _from);
+    from = crypto_translate_path(ctx, _from);
     to = translate_path(ctx, _to);
     res = symlink(from, to);
     g_free(from);
@@ -345,34 +381,75 @@ static int cryptofs_truncate(const char *_path, off_t size)
     return 0;
 }
 
-static int cryptofs_utime(const char *_path, struct utimbuf *buf)
+static int cryptofs_ftruncate(const char *path, off_t size,
+                    	      struct fuse_file_info *fi)
 {
-    gchar *path;
     int res;
 
-    path = translate_path(get_ctx(), _path);
-    res = utime(path, buf);
-    g_free(path);
-    if(res == -1)
+    (void) path;
+
+    res = ftruncate(fi->fh, size);
+    if (res == -1)
         return -errno;
 
     return 0;
 }
 
+static int cryptofs_utimens(const char *_path, const struct timespec ts[2])
+{
+    gchar *path;
+    int res;
+    struct timeval tv[2];
+
+    path = translate_path(get_ctx(), _path);
+
+    tv[0].tv_sec = ts[0].tv_sec;
+    tv[0].tv_usec = ts[0].tv_nsec / 1000;
+    tv[1].tv_sec = ts[1].tv_sec;
+    tv[1].tv_usec = ts[1].tv_nsec / 1000;
+
+    res = utimes(path, tv);
+    g_free(path);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int get_flags(int flags) {
+    if(flags & O_WRONLY) {
+    	flags &= ~O_WRONLY;
+	flags |= O_RDWR;
+    }
+    flags &= ~O_APPEND;
+
+    return flags;
+}
+
+static int cryptofs_create(const char *_path, mode_t mode, struct fuse_file_info *fi)
+{
+    gchar *path;
+    int fd;
+
+    path = translate_path(get_ctx(), _path);
+
+    fd = open(path, get_flags(fi->flags), mode);
+    g_free(path);
+    if (fd == -1)
+        return -errno;
+
+    fi->fh = fd;
+    return 0;
+}
 
 static int cryptofs_open(const char *_path, struct fuse_file_info *fi)
 {
     gchar *path;
     int fd;
-    int flags;
 
     path = translate_path(get_ctx(), _path);
-    flags = fi->flags;
-    if(flags & O_WRONLY) {
-    	flags &= ~O_WRONLY;
-	flags |= O_RDWR;
-    }
-    fd = open(path, flags);
+
+    fd = open(path, get_flags(fi->flags), 0);
     g_free(path);
     if(fd == -1)
         return -errno;
@@ -421,6 +498,23 @@ static int cryptofs_statfs(const char *_path, struct statvfs *stbuf)
     return 0;
 }
 
+static int cryptofs_flush(const char *path, struct fuse_file_info *fi)
+{
+    int res;
+
+    (void) path;
+    /* This is called from every close on an open file, so call the
+       close on the underlying filesystem.  But since flush may be
+       called multiple times for an open file, this must not really
+       close the file.  This is important if used on a network
+       filesystem like NFS which flush the data/metadata on close() */
+    res = close(dup(fi->fh));
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
 static int cryptofs_release(const char *path, struct fuse_file_info *fi)
 {
     (void) path;
@@ -451,6 +545,8 @@ static int cryptofs_fsync(const char *path, int isdatasync,
 
 static struct fuse_operations cryptofs_oper = {
     .getattr	= cryptofs_getattr,
+    .fgetattr   = cryptofs_fgetattr,
+    .access	= cryptofs_access,
     .readlink	= cryptofs_readlink,
     .opendir	= cryptofs_opendir,
     .readdir	= cryptofs_readdir,
@@ -465,11 +561,16 @@ static struct fuse_operations cryptofs_oper = {
     .chmod	= cryptofs_chmod,
     .chown	= cryptofs_chown,
     .truncate	= cryptofs_truncate,
-    .utime	= cryptofs_utime,
+    .ftruncate  = cryptofs_ftruncate,
+    .utimens	= cryptofs_utimens,
+#ifndef BSD
+    .create     = cryptofs_create,
+#endif
     .open	= cryptofs_open,
     .read	= cryptofs_read,
     .write	= cryptofs_write,
     .statfs	= cryptofs_statfs,
+    .flush      = cryptofs_flush,
     .release	= cryptofs_release,
     .fsync	= cryptofs_fsync,
 };

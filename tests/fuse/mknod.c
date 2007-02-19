@@ -36,7 +36,7 @@ int test()
     fs_init(".", getGlobalTestContext());
     ops = fs_get_fuse_operations();
 
-    mode = S_IFREG;
+    mode = S_IFREG | O_WRONLY | O_CREAT | O_EXCL; 
     if (ops->mknod("test", mode, 0) < 0) {
 	perror("Cound not create file");
 	return 1;

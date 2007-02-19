@@ -18,11 +18,14 @@
 
 #include "config.h"
 
+#define _XOPEN_SOURCE 500
+
 #include <stdio.h>
 
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include <glib.h>
 #include <gcrypt.h>
@@ -123,6 +126,8 @@ CryptoCtxGlobal *crypto_create_global_ctx(const gchar *cipheralgo, const gchar *
     gctx->count = 0;
     gcry_cipher_close(cipher_hd);
     cipher_hd = NULL;
+
+    signal(SIGXFSZ, SIG_IGN);
 
     return gctx;
 }
@@ -280,34 +285,36 @@ void *crypto_get_filebuf(CryptoCtxLocal *ctx)
     return ctx->filebuf;
 }
 
-int crypto_readblock(CryptoCtxLocal *ctx, int fp, int block)
+int crypto_readblock(CryptoCtxLocal *ctx, int fp, long long block)
 {
     int res;
-
+/*
     if (lseek(fp, block * ctx->global->fileblocksize, SEEK_SET) < 0)
 	return -1;
-
-    if ((res = read(fp, ctx->filebuf, ctx->global->fileblocksize)) < 0)
+*/
+    if ((res = pread(fp, ctx->filebuf, ctx->global->fileblocksize, block * ctx->global->fileblocksize)) < 0)
 	return -1;
 
-    gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[block % ctx->global->num_of_salts], ctx->global->blocksize);
-    gcry_cipher_decrypt(ctx->cipher_hd, ctx->filebuf, res, NULL, 0);
+    if (res > 0) {
+	gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[block % ctx->global->num_of_salts], ctx->global->blocksize);
+        gcry_cipher_decrypt(ctx->cipher_hd, ctx->filebuf, res, NULL, 0);
+    }
 
     return res;
 }
 
-int crypto_writeblock(CryptoCtxLocal *ctx, int fp, int block, unsigned long size)
+int crypto_writeblock(CryptoCtxLocal *ctx, int fp, long long block, size_t size)
 {
     gcry_cipher_setiv(ctx->cipher_hd, ctx->global->salts[block % ctx->global->num_of_salts], ctx->global->blocksize);
     gcry_cipher_encrypt(ctx->cipher_hd, ctx->filebuf, size, NULL, 0);
-
+/*
     if (lseek(fp, block * ctx->global->fileblocksize, SEEK_SET) < 0)
 	return -1;
-
-    return write(fp, ctx->filebuf, size);
+*/
+    return pwrite(fp, ctx->filebuf, size, block * ctx->global->fileblocksize);
 }
 
-static void translate_pos(long long offset, unsigned long count,
+static void translate_pos(off_t offset, size_t count,
 			  long long block, unsigned long blocksize,
 			  unsigned long *inblock_offset, unsigned long *inblock_count)
 {
@@ -323,7 +330,7 @@ static void translate_pos(long long offset, unsigned long count,
 	    *inblock_count = (offset + count) % blocksize - *inblock_offset;
 }
 
-int crypto_read(CryptoCtxLocal *ctx, int fp, void *buf, unsigned long count, long long offset)
+int crypto_read(CryptoCtxLocal *ctx, int fp, void *buf, size_t count, off_t offset)
 {
     long long block;
     unsigned long mempos = 0;
@@ -356,36 +363,89 @@ int crypto_read(CryptoCtxLocal *ctx, int fp, void *buf, unsigned long count, lon
     return error ? -1 : mempos;
 }
 
-int crypto_write(CryptoCtxLocal *ctx, int fp, void *buf, unsigned long count, long long offset)
+/* #define DUMPDATA 1 */
+#ifdef DUMPDATA
+static dump(void *buf, size_t count, off_t offset)
 {
-    long long block;
-    unsigned long mempos = 0;
-    unsigned long blocksize = ctx->global->fileblocksize;
-    gboolean error = FALSE;
+    int i, noxdigit = 0;
 
-    block = offset / blocksize;
+    printf("    {%li, %lli,\n      \"", count, offset);
+    for(i = 0; i < count; i++) {
+	unsigned char c = ((char *) buf)[i];
 
-    for (block = offset / blocksize; block * blocksize < offset + count; block++) {
-	unsigned long inblock_offset = 0;
-	unsigned long inblock_count = 0;
-
-	translate_pos(offset, count, block, blocksize, &inblock_offset, &inblock_count);
-
-	if ((inblock_offset != 0) && (inblock_count != blocksize)) {
-	    if (crypto_readblock(ctx, fp, block) < 0) {
-		error = TRUE;
-		break;
-	    }
+	if (c == '"') {
+	    printf("\\\"");
+	    noxdigit = 0;
+	} else if (c == '\\') {
+	    printf("\\\\");
+	    noxdigit = 0;
+	} else if (noxdigit && isxdigit(c)) {
+	    printf("\\x%02x", c);
+	    noxdigit = 1;
+	} else if (isprint(c)) {
+	    printf("%c", c);
+	    noxdigit = 0;
+	} else {
+	    printf("\\x%02x", c);
+	    noxdigit = 1;
 	}
 
-	memmove(ctx->filebuf + inblock_offset, buf + mempos, inblock_count);
+	if (i % 128 == 127)
+	    printf("\"\n      \"");
+    }
+    printf("\"},\n");
+}
+#endif
 
-	if (crypto_writeblock(ctx, fp, block, inblock_offset + inblock_count) < 0) {
+int crypto_write(CryptoCtxLocal *ctx, int fp, void *buf, size_t count, off_t offset)
+{
+    long long block;
+    unsigned long mempos;
+    unsigned long blocksize = ctx->global->fileblocksize;
+    gboolean error = FALSE;
+    off_t fsize;
+    off_t fpos;
+
+#ifdef DUMPDATA
+    dump(buf, count, offset);
+#endif
+
+    fsize = lseek(fp, 0, SEEK_END);
+    if (fsize < offset)
+	fpos = fsize;
+    else
+	fpos = offset;
+    mempos = 0;
+    for (block = fpos / blocksize; block * blocksize < offset + count; block++) {
+	unsigned long inblock_offset = 0;
+	unsigned long inblock_count = 0;
+	int res;
+
+	if ((res = crypto_readblock(ctx, fp, block)) < 0) {
+	    error = TRUE;
+	    break;
+	}
+	if (res < blocksize) {
+	    memset(ctx->filebuf + res, 0, blocksize - res);
+	}
+
+	if (fpos / blocksize >= offset / blocksize) {
+	    translate_pos(offset, count, block, blocksize, &inblock_offset, &inblock_count);
+
+	    memmove(ctx->filebuf + inblock_offset, buf + mempos, inblock_count);
+	    mempos += inblock_count;
+	} else {
+	    inblock_offset = 0;
+	    inblock_count = blocksize;
+	}
+
+	if (crypto_writeblock(ctx, fp, block, res > inblock_offset + inblock_count ? res : inblock_offset + inblock_count) < 0) {
+	    perror("...");
 	    error = TRUE;
 	    break;
 	}
 
-	mempos += inblock_count;
+	fpos = (block + 1) * blocksize;
     }
 
     return error ? -1 : mempos;

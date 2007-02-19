@@ -1,11 +1,13 @@
 TESTS = \
     context \
     encdecname conffilename \
-    writereadblock
+    writereadblock \
+    write
 
 check_PROGRAMS = $(TESTS)
 
 AM_CFLAGS = \
+	-D_FILE_OFFSET_BITS=64 \
 	-I$(top_srcdir)/src/cryptofs \
 	-I$(top_srcdir)/tests \
 	$(GLIB_CFLAGS)

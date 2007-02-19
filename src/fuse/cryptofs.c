@@ -80,5 +80,5 @@ int main(int argc, char *argv[])
 
     fs_init(rootpath, crypto_create_global_ctx_default(cipheralgo, mdalgo, fileblocksize, num_of_salts));
 
-    return fuse_main(argc, argv, fs_get_fuse_operations());
+    return fuse_main(argc, argv, fs_get_fuse_operations(), NULL);
 }
