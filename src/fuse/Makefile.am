@@ -26,6 +26,6 @@ libfs_la_CFLAGS = \
 	$(FUSE_CFLAGS)
 
 libfs_la_LIBADD = \
-	$(top_builddir)/src/cryptofs/libcryptofs.la
+	$(top_builddir)/src/cryptofs/libcryptofs.la \
 	$(GLIB_LIBS) \
 	$(FUSE_LIBS)
