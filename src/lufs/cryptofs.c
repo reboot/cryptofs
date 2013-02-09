@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2006 Christoph Hohmann
+ * Copyright (C) 2003-2013 Christoph Hohmann
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -105,6 +105,8 @@ void *cryptofs_init(struct list_head *cfg, struct dir_cache *cache, struct crede
 	const gchar *cipheralgo, *mdalgo;
 	long int fileblocksize;
 	long int num_of_salts;
+
+        g_slice_set_config(G_SLICE_CONFIG_ALWAYS_MALLOC, TRUE);
 
 	root = lu_opt_getchar(cfg, "MOUNT", "root");
 

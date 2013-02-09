@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Christoph Hohmann
+ * Copyright (C) 2006-2013 Christoph Hohmann
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -67,6 +67,7 @@ int main(int argc, char *argv[])
     long int num_of_salts;
 
     umask(0);
+    g_slice_set_config(G_SLICE_CONFIG_ALWAYS_MALLOC, TRUE);
 
     help_fuse_argv[0] = argv[0];
 
