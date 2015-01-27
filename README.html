@@ -1,0 +1,394 @@
+<DIV
+CLASS="ARTICLE"
+><DIV
+CLASS="TITLEPAGE"
+><H1
+CLASS="title"
+><A
+NAME="AEN2"
+>CryptoFS</A
+></H1
+><H3
+CLASS="author"
+><A
+NAME="AEN4"
+>B.Sc. Christoph Hohmann</A
+></H3
+><DIV
+CLASS="affiliation"
+><DIV
+CLASS="address"
+><P
+CLASS="address"
+><CODE
+CLASS="email"
+>&#60;<A
+HREF="mailto:reboot@gmx.ch"
+>reboot@gmx.ch</A
+>&#62;</CODE
+></P
+></DIV
+></DIV
+><P
+CLASS="copyright"
+>Copyright &copy; 2003-2006 Christoph Hohmann</P
+><HR></DIV
+><DIV
+CLASS="TOC"
+><DL
+><DT
+><B
+>Table of Contents</B
+></DT
+><DT
+>1. <A
+HREF="#AEN14"
+>What's CryptoFS</A
+></DT
+><DT
+>2. <A
+HREF="#AEN21"
+>Why CryptoFS?</A
+></DT
+><DT
+>3. <A
+HREF="#AEN24"
+>Requirements</A
+></DT
+><DT
+>4. <A
+HREF="#AEN35"
+>Usage</A
+></DT
+><DT
+>5. <A
+HREF="#AEN45"
+>How does it work?</A
+></DT
+><DD
+><DL
+><DT
+>5.1. <A
+HREF="#AEN47"
+>The .cryptofs config file</A
+></DT
+><DT
+>5.2. <A
+HREF="#AEN68"
+>Encryption</A
+></DT
+></DL
+></DD
+><DT
+>6. <A
+HREF="#AEN74"
+>Download</A
+></DT
+></DL
+></DIV
+><DIV
+CLASS="sect1"
+><H2
+CLASS="sect1"
+><A
+NAME="AEN14"
+>1. What's CryptoFS</A
+></H2
+><P
+>&#13;	    CryptoFS is a encrypted filesystem for Filesystem in Userspace
+	    (FUSE) and the Linux Userland FileSystem (LUFS).  Visit <A
+HREF="http://fuse.sourceforge.net/"
+TARGET="_top"
+>http://fuse.sourceforge.net/</A
+>
+	    for more information on FUSE or <A
+HREF="http://lufs.sourceforge.net/lufs/"
+TARGET="_top"
+>http://lufs.sourceforge.net/lufs/</A
+>
+	    for more information on LUFS.
+	</P
+><P
+>&#13;	    CryptoFS will use a normal directory to store files encrypted.
+	    The mountpoint will contain the decrypted files. Every file
+	    stored in this mountpoint will be written encrypted (data
+	    and filename) to the directory that was mounted. If you
+	    unmount the directory the encrypted data can only be access
+	    by mounting the directory with the correct key again. Like
+	    other FUSE/LUFS filesystems it does not need root access
+	    or any complicated setup like creating a filesystem on a
+	    encrypted disk using the loop device.
+        </P
+><P
+>&#13;	    CryptoFS can be build for FUSE and LUFS. When you build for
+	    FUSE you get a program to mount the filesystem. For LUFS a
+	    shared library will be built that can be used by LUFS's lufsd.
+	    Both methods can use the same encrypted directory.
+	</P
+></DIV
+><DIV
+CLASS="sect1"
+><HR><H2
+CLASS="sect1"
+><A
+NAME="AEN21"
+>2. Why CryptoFS?</A
+></H2
+><P
+>&#13;	    I first used the evfs kernel patch that does nearly the same thing
+	    as CryptoFS. But it seems that it has been abandoned. The last patch
+	    was available for kernel 2.4.20 and has not been updated for newer
+	    kernels since then. When I found LUFS I thought I could be a good
+	    base for a crypto filesystem that works like evfs and allows a user
+	    to mount any directory as an encrypted storage without having root
+	    access and creating a crypto filesystem using the loop device. So
+	    when I found no other program that offers this posibilities I started
+	    to write my own filesystem for LUFS. Unfortunately LUFS seems to be
+	    dead too, so CryptoFS can now be build for FUSE too which has already
+	    made it into the official Linux kernel package.
+	</P
+></DIV
+><DIV
+CLASS="sect1"
+><HR><H2
+CLASS="sect1"
+><A
+NAME="AEN24"
+>3. Requirements</A
+></H2
+><P
+>&#13;	    You either need FUSE or LUFS to use CryptoFS.
+	    For FUSE you need the FUSE tools, library and
+	    kernel module.  You also need the FUSE development
+	    files to build the FUSE filesystem. See <A
+HREF="http://fuse.sourceforge.net/"
+TARGET="_top"
+>http://fuse.sourceforge.net/</A
+>
+	    for more information and downloads. If you don't want to build
+	    CryptoFS for FUSE you can use the --disable-fuse configure
+	    switch. Otherwise it will be build when the development files
+	    are found on the system. For LUFS you only have to install
+	    the LUFS tools and load the LUFS kernel module. See <A
+HREF="http://lufs.sourceforge.net/lufs/"
+TARGET="_top"
+>http://lufs.sourceforge.net/lufs/</A
+>
+	    on how to do this and downloads for LUFS. If you want
+	    to disable building CryptoFS for LUFS you can use the
+	    --disable-lufs configure switch.  As the LUFS module has no
+	    requirements it will be build by default.	 Installing and
+	    setting up LUFS and FUSE will not be covered by this document.
+	</P
+><P
+>&#13;	    CryptoFS uses Libgcrypt from <A
+HREF="ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/"
+TARGET="_top"
+>ftp://ftp.gnupg.org/gcrypt/alpha/libgcrypt/</A
+>
+	    (version &#62;= 1.1.44) and GLib from <A
+HREF="http://www.gtk.org"
+TARGET="_top"
+>http://www.gtk.org</A
+>
+	    (version &#62;= 2.6). You must have installed these packages
+	    correctly before running CryptoFS's "configure" script.
+	</P
+><P
+>&#13;	    Optionally CryptoFS can use the <A
+HREF="ftp://ftp.gnupg.org/gcrypt/pinentry/"
+TARGET="_top"
+>PIN Entry</A
+>
+	    utility by <A
+HREF="http://www.gnupg.org/"
+TARGET="_top"
+>GnuPG</A
+>
+	    to ask the user for the filesystem's password. If the pinentry
+	    program is found on the system CryptoFS will be automatically
+	    built with PIN Entry support. Otherwise it will fall back
+	    to the old console input method.
+	</P
+></DIV
+><DIV
+CLASS="sect1"
+><HR><H2
+CLASS="sect1"
+><A
+NAME="AEN35"
+>4. Usage</A
+></H2
+><P
+>&#13;	    First you have to set up the source directory by copying
+	    the file cryptofs.conf to &#60;source&#62;/.cryptofs. Where
+	    &#60;source&#62; is the directory where you want to store
+	    the encryted files. You can adjust the values in the file,
+	    but the default should work fine.
+	</P
+><P
+>&#13;	    For FUSE you have to run cryptofs that should be in an executeable
+	    path after "make install". The required options are
+	    <PRE
+CLASS="programlisting"
+>     cryptofs --root=&#60;source&#62; &#60;dest&#62; </PRE
+>
+	    &#60;dest&#62; is the directory where the filesystem containing
+	    the decrypted files will be mounted.
+	</P
+><P
+>		    
+    	    For LUFS put the shared library into a directory where the system linker can find
+	    it (this will usually be done by "make install") or add the directory
+	    to the search path by setting the LD_LIBRARY_PATH environment varibale.
+	</P
+><P
+>&#13;	    After that you can mount the source directory with
+	    <PRE
+CLASS="programlisting"
+>     lufsmount cryptofs://&#60;source&#62; &#60;dest&#62; </PRE
+>
+	</P
+><P
+>&#13;	    You will be asked for the password you want to use for this filesystem. It
+	    will be used to generate the cipher key.
+	</P
+><P
+>&#13;	    After that you should be able to use the &#60;dest&#62; directory like any other
+	    directory, but all data will be read and written to the &#60;source&#62; directory
+	    in an encrypted form.
+	</P
+></DIV
+><DIV
+CLASS="sect1"
+><HR><H2
+CLASS="sect1"
+><A
+NAME="AEN45"
+>5. How does it work?</A
+></H2
+><DIV
+CLASS="sect2"
+><H3
+CLASS="sect2"
+><A
+NAME="AEN47"
+>5.1. The .cryptofs config file</A
+></H3
+><P
+>&#13;		The CryptoFS config file in each encryted directory contains 4 options.
+		These are
+		<P
+></P
+><DIV
+CLASS="variablelist"
+><DL
+><DT
+>cipher</DT
+><DD
+><P
+>&#13;				The cipher algorithm used to encrypt files and filenames.
+				This has to be a cipher name known by libgcrypt.
+			    </P
+></DD
+><DT
+>md</DT
+><DD
+><P
+>&#13;				The message digest algorithm used to generate the cipher
+				key. This has to be a message digest name known by
+				libgcrypt.
+			    </P
+></DD
+><DT
+>blocksize</DT
+><DD
+><P
+>&#13;				An encrypted file can not be randomly accessed like a normal
+				file and CryptoFS always reads and writes blocks of this size.
+			    </P
+></DD
+><DT
+>salts</DT
+><DD
+><P
+>&#13;				This is the number of subkeys CryptoFS will generate to
+				encrypt blocks.
+			    </P
+></DD
+></DL
+></DIV
+>
+		<SPAN
+CLASS="emphasis"
+><I
+CLASS="emphasis"
+>NOTE:</I
+></SPAN
+> Before 0.4.0 CryptoFS used a different config file format.
+		The LUFS module can still read this format. The FUSE program only supports
+		the new format. If you want to switch from LUFS to FUSE you have to
+	        replace .cryptofs with a file in the new format.
+	    </P
+></DIV
+><DIV
+CLASS="sect2"
+><HR><H3
+CLASS="sect2"
+><A
+NAME="AEN68"
+>5.2. Encryption</A
+></H3
+><P
+>&#13;		When a filesystem is mounted CryptoFS first generates a key for the
+		requested cipher algorithm (cipher option) using the message
+		digest function (md option). Every algorithm has a specific key size
+		and every message digest function has a specific length of the
+		generated message digest. If the message digest size is smaller then
+		the keysize the message digest will be repeated until the key size
+		is reached.
+	    </P
+><P
+>&#13;		After they primary key has been generated n (= salts option= subkeys
+		(initialization vectors) will be generated by encrypting 0 bytes with
+		a 0 initialization vector. These will later be used to encrypt blocks
+		with different subkeys to make sure the cipher text will first repeat
+		after (salts * blocksize) bytes (If the same data is encrypted).
+	    </P
+><P
+>&#13;		When files or links are created or renamed the name will be encoded
+		with the selected cipher, the primary key and the first subkey.
+		The result will then be encoded using a modified Base64 algorithm
+		because the encrypted filename could contain characters that are not
+		allowed by the target filesystem. (The original Base64 algorithm
+		uses '/' for encoding. This is the directory delimiter so it was
+		replaced by '_')
+	    </P
+><P
+>&#13;		When files are written the data will be encrypted. CryptoFS always
+		has to write full blocks. So if only a part of a block should be
+		written the original block will first be read, decrypted, the part
+		replaced and then the result then written encrypted back to disk.
+		To keep this performant that block size must not be too large.
+		But to make sure the cipher text does not repeat to early, CryptoFS
+		uses salts to encrypt blocks. Every block will be encoded with
+		the (blocknumber module salts)th salt. (NOTE: Linux always reads
+		or writes "pages" of size 4096 bytes, these writes will be
+		forwarded by lufsd to CryptoFS. So if you use a blocksize of
+		4096 bytes reading the old block before writing can be omitted
+		and writing should be faster)
+	    </P
+></DIV
+></DIV
+><DIV
+CLASS="sect1"
+><HR><H2
+CLASS="sect1"
+><A
+NAME="AEN74"
+>6. Download</A
+></H2
+><P
+>{% include_relative download.html %}</P
+></DIV
+></DIV
